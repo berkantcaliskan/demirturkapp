@@ -63,6 +63,41 @@ extension NoteStatusExtension on NoteStatus {
   }
 }
 
+class SalesAdvisor {
+  final String id;
+  final String name;
+  final String roleTitle;
+  final String phone;
+  final String photoUrl;
+  final DateTime photoUpdatedAt;
+
+  const SalesAdvisor({
+    required this.id,
+    required this.name,
+    required this.roleTitle,
+    required this.phone,
+    required this.photoUrl,
+    required this.photoUpdatedAt,
+  });
+
+  SalesAdvisor copyWith({
+    String? name,
+    String? roleTitle,
+    String? phone,
+    String? photoUrl,
+    DateTime? photoUpdatedAt,
+  }) {
+    return SalesAdvisor(
+      id: id,
+      name: name ?? this.name,
+      roleTitle: roleTitle ?? this.roleTitle,
+      phone: phone ?? this.phone,
+      photoUrl: photoUrl ?? this.photoUrl,
+      photoUpdatedAt: photoUpdatedAt ?? this.photoUpdatedAt,
+    );
+  }
+}
+
 class Customer {
   final String id;
   final String name;
@@ -71,6 +106,7 @@ class Customer {
   final String email;
   final String address;
   final String contractNo;
+  final String assignedAdvisorId;
 
   const Customer({
     required this.id,
@@ -80,7 +116,52 @@ class Customer {
     required this.email,
     required this.address,
     required this.contractNo,
+    this.assignedAdvisorId = 'adv_1',
   });
+
+  String get firstName => name.trim().split(RegExp(r'\s+')).first;
+
+  String get projectImageAsset {
+    final lower = address.toLowerCase();
+    if (lower.contains('asel') || id == 'cust_2') {
+      return 'assets/images/aselforweb.jpeg';
+    }
+    if (lower.contains('almina') || id == 'cust_3') {
+      return 'assets/images/alminaforweb.jpeg';
+    }
+    if (lower.contains('seaside')) {
+      return 'assets/images/seasideforweb.jpeg';
+    }
+    return 'assets/images/yenisehirforweb.jpeg';
+  }
+
+  String get projectTitle {
+    final lower = address.toLowerCase();
+    if (lower.contains('asel') || id == 'cust_2') {
+      return 'Asel Doğa Evleri';
+    }
+    if (lower.contains('almina') || id == 'cust_3') {
+      return 'Almina Evleri';
+    }
+    if (lower.contains('seaside')) {
+      return 'Seaside House';
+    }
+    return 'Yenişehir, 3. Etap';
+  }
+
+  String get unitSubtitle {
+    final lower = address.toLowerCase();
+    if (lower.contains('asel') || id == 'cust_2') {
+      return '2. Etap • B Blok Daire 4';
+    }
+    if (lower.contains('almina') || id == 'cust_3') {
+      return 'Plaj Cd. • 2. Etap Daire 7';
+    }
+    if (lower.contains('seaside')) {
+      return 'Karasu • Sahil Rezidans';
+    }
+    return 'A Blok • Daire 12';
+  }
 }
 
 class PromissoryNote {
@@ -186,6 +267,7 @@ class SupportTicket {
   final String customerId;
   final String subject;
   final String category;
+  final String channel; // 'advisor' | 'finance' | 'general'
   final String? relatedSenetNo;
   final bool isResolved;
   final DateTime updatedAt;
@@ -196,6 +278,7 @@ class SupportTicket {
     required this.customerId,
     required this.subject,
     required this.category,
+    this.channel = 'general',
     this.relatedSenetNo,
     required this.isResolved,
     required this.updatedAt,
@@ -212,6 +295,7 @@ class SupportTicket {
       customerId: customerId,
       subject: subject,
       category: category,
+      channel: channel,
       relatedSenetNo: relatedSenetNo,
       isResolved: isResolved ?? this.isResolved,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -286,4 +370,22 @@ String formatDate(DateTime date) {
 
 String formatShortDate(DateTime date) {
   return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+}
+
+String formatCompactCurrency(double amount) {
+  if (amount >= 1000000) {
+    final val = amount / 1000000;
+    final formatted = val == val.roundToDouble()
+        ? val.toInt().toString()
+        : val.toStringAsFixed(1).replaceAll('.', ',');
+    return '₺${formatted}M';
+  }
+  if (amount >= 1000) {
+    final val = amount / 1000;
+    final formatted = val == val.roundToDouble()
+        ? val.toInt().toString()
+        : val.toStringAsFixed(1).replaceAll('.', ',');
+    return '₺${formatted}B';
+  }
+  return '₺${amount.toInt()}';
 }

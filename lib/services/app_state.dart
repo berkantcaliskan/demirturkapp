@@ -26,6 +26,12 @@ class AppState extends ChangeNotifier {
   Customer get currentCustomer =>
       _customers.firstWhere((c) => c.id == _selectedCustomerId);
 
+  SalesAdvisor get currentSalesAdvisor => _salesAdvisors.firstWhere(
+        (a) => a.id == currentCustomer.assignedAdvisorId,
+        orElse: () => _salesAdvisors.first,
+      );
+
+  List<SalesAdvisor> get salesAdvisors => List.unmodifiable(_salesAdvisors);
   List<Customer> get customers => List.unmodifiable(_customers);
   List<PromissoryNote> get allNotes => List.unmodifiable(_notes);
   List<BankAccount> get bankAccounts => List.unmodifiable(_bankAccounts);
@@ -76,6 +82,36 @@ class AppState extends ChangeNotifier {
     ),
   ];
 
+  final List<SalesAdvisor> _salesAdvisors = [
+    SalesAdvisor(
+      id: 'adv_1',
+      name: 'Selim Demirtürk',
+      roleTitle: 'Kıdemli Satış Danışmanı',
+      phone: '+90 543 667 34 54',
+      photoUrl:
+          'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=85',
+      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
+    ),
+    SalesAdvisor(
+      id: 'adv_2',
+      name: 'Elif Karahan',
+      roleTitle: 'Kurumsal Satış Danışmanı',
+      phone: '+90 543 667 34 54',
+      photoUrl:
+          'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=85',
+      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
+    ),
+    SalesAdvisor(
+      id: 'adv_3',
+      name: 'Burak Aydın',
+      roleTitle: 'Proje Satış Danışmanı',
+      phone: '+90 543 667 34 54',
+      photoUrl:
+          'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=800&q=85',
+      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
+    ),
+  ];
+
   final List<Customer> _customers = [
     const Customer(
       id: 'cust_1',
@@ -85,6 +121,7 @@ class AppState extends ChangeNotifier {
       email: 'ahmet.yilmaz@eposta.com',
       address: 'Yalı Mah. Yeni Şehir 3. Etap A Blok Daire 12 Karasu / Sakarya',
       contractNo: 'DMR-2026-0148',
+      assignedAdvisorId: 'adv_1',
     ),
     const Customer(
       id: 'cust_2',
@@ -94,6 +131,7 @@ class AppState extends ChangeNotifier {
       email: 'muhasebe@kayayatirim.com.tr',
       address: 'Aziziye Mah. Asel Doğa Evleri 2 B Blok Daire 4 Karasu / Sakarya',
       contractNo: 'DMR-2026-0205',
+      assignedAdvisorId: 'adv_2',
     ),
     const Customer(
       id: 'cust_3',
@@ -103,6 +141,7 @@ class AppState extends ChangeNotifier {
       email: 'zeynepdemir@eposta.com',
       address: 'Yalı Mah. Plaj Cd. Almina Evleri 2 Daire 7 Karasu / Sakarya',
       contractNo: 'DMR-2026-0312',
+      assignedAdvisorId: 'adv_3',
     ),
   ];
 
@@ -281,7 +320,8 @@ class AppState extends ChangeNotifier {
       id: 'tck_1',
       customerId: 'cust_1',
       subject: 'SNT-2026-003 Gecikmiş Senet Ödeme Tarihi Hakkında',
-      category: 'Vade & Ödeme Planı',
+      category: 'Finans & Muhasebe',
+      channel: 'finance',
       relatedSenetNo: 'SNT-2026-003',
       isResolved: false,
       updatedAt: DateTime(2026, 11, 4, 13, 15),
@@ -297,7 +337,7 @@ class AppState extends ChangeNotifier {
         ChatMessage(
           id: 'msg_2',
           isFromAdmin: true,
-          senderName: 'Finans & Muhasebe Departmanı',
+          senderName: 'Finans & Muhasebe Uzmanı',
           text:
               'Merhaba Ahmet Bey, bilgilendirmeniz için teşekkür ederiz. Ödemeyi gerçekleştirdikten sonra uygulama üzerinden dekontu yükleyebilirsiniz, işleminiz hemen onaylanacaktır.',
           timestamp: DateTime(2026, 11, 4, 13, 15),
@@ -305,10 +345,30 @@ class AppState extends ChangeNotifier {
       ],
     ),
     SupportTicket(
+      id: 'tck_adv_1',
+      customerId: 'cust_1',
+      subject: 'Selim Demirtürk • Satış Danışmanı Görüşmesi',
+      category: 'Satış Danışmanım',
+      channel: 'advisor',
+      isResolved: false,
+      updatedAt: DateTime(2026, 11, 5, 11, 30),
+      messages: [
+        ChatMessage(
+          id: 'msg_adv_1',
+          isFromAdmin: true,
+          senderName: 'Selim Demirtürk',
+          text:
+              'Merhaba Ahmet Bey, Yenişehir 3. Etap A Blok Daire 12 konutunuzla ilgili her türlü sorunuzda doğrudan buradan bana ulaşabilirsiniz.',
+          timestamp: DateTime(2026, 11, 5, 11, 30),
+        ),
+      ],
+    ),
+    SupportTicket(
       id: 'tck_2',
       customerId: 'cust_2',
       subject: 'Ekim Ayı Filo Senedi Dekont Bildirimi',
-      category: 'Dekont & Tahsilat',
+      category: 'Finans & Muhasebe',
+      channel: 'finance',
       relatedSenetNo: 'SNT-2026-102',
       isResolved: false,
       updatedAt: DateTime(2026, 11, 4, 10, 05),
@@ -605,6 +665,77 @@ class AppState extends ChangeNotifier {
     return id;
   }
 
+  // Danışman fotoğrafını güncelledikçe otomatik olarak tüm ekranlarda yenilenir
+  void updateSalesAdvisorPhoto(String advisorId, String newPhotoUrl) {
+    final index = _salesAdvisors.indexWhere((a) => a.id == advisorId);
+    if (index == -1) return;
+    _salesAdvisors[index] = _salesAdvisors[index].copyWith(
+      photoUrl: newPhotoUrl,
+      photoUpdatedAt: DateTime.now(),
+    );
+    notifyListeners();
+  }
+
+  // Müşterinin ilgili iletişim kanalındaki (advisor | finance | general) aktif konuşmasını getirir veya başlatır
+  SupportTicket getOrCreateChannelTicket(String channel) {
+    final customer = currentCustomer;
+    final existingIndex = _tickets.indexWhere(
+      (t) => t.customerId == customer.id && t.channel == channel,
+    );
+    if (existingIndex != -1) {
+      return _tickets[existingIndex];
+    }
+
+    final advisor = currentSalesAdvisor;
+    final String subject;
+    final String category;
+    final String welcomeSender;
+    final String welcomeText;
+
+    if (channel == 'advisor') {
+      subject = '${advisor.name} • Satış Danışmanı Görüşmesi';
+      category = 'Satış Danışmanım';
+      welcomeSender = advisor.name;
+      welcomeText =
+          'Merhaba ${customer.name}, ${customer.projectTitle} (${customer.unitSubtitle}) konutunuzla ilgili her konuda bana doğrudan buradan yazabilirsiniz.';
+    } else if (channel == 'finance') {
+      subject = 'Finans Uzmanı & Muhasebe Görüşmesi';
+      category = 'Finans & Muhasebe';
+      welcomeSender = 'Finans & Muhasebe Uzmanı';
+      welcomeText =
+          'Merhaba ${customer.name}, senet vadeleriniz, ödeme dekontlarınız ve hesap mutabakatınız için muhasebe birimimizle doğrudan buradan görüşebilirsiniz.';
+    } else {
+      subject = 'Genel Şirket Paneli • Yetkili Destek Hattı';
+      category = 'Genel Şirket Paneli';
+      welcomeSender = 'Demirtürk Yetkili Masası';
+      welcomeText =
+          'Merhaba ${customer.name}, mesajınız doğrudan genel şirket paneline iletilir. Müsait olan ilk yetkilimiz size anında yanıt verecektir.';
+    }
+
+    final created = SupportTicket(
+      id: 'tck_${channel}_${customer.id}_${DateTime.now().millisecondsSinceEpoch}',
+      customerId: customer.id,
+      subject: subject,
+      category: category,
+      channel: channel,
+      isResolved: false,
+      updatedAt: DateTime.now(),
+      messages: [
+        ChatMessage(
+          id: 'msg_welcome_${DateTime.now().millisecondsSinceEpoch}',
+          isFromAdmin: true,
+          senderName: welcomeSender,
+          text: welcomeText,
+          timestamp: DateTime.now(),
+        ),
+      ],
+    );
+
+    _tickets.insert(0, created);
+    notifyListeners();
+    return created;
+  }
+
   // Customer or Admin action: Reply to a support ticket
   void sendTicketMessage({
     required String ticketId,
@@ -617,12 +748,24 @@ class AppState extends ChangeNotifier {
 
     final ticket = _tickets[index];
     final customer = getCustomerById(ticket.customerId);
+    final advisor = _salesAdvisors.firstWhere(
+      (a) => a.id == customer.assignedAdvisorId,
+      orElse: () => _salesAdvisors.first,
+    );
+
+    final String adminSenderName;
+    if (ticket.channel == 'advisor') {
+      adminSenderName = advisor.name;
+    } else if (ticket.channel == 'finance') {
+      adminSenderName = 'Finans & Muhasebe Uzmanı';
+    } else {
+      adminSenderName = 'Şirket Yetkilisi (Genel Panel)';
+    }
 
     final newMessage = ChatMessage(
       id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
       isFromAdmin: isFromAdmin,
-      senderName:
-          isFromAdmin ? 'Finans & Muhasebe Departmanı' : customer.name,
+      senderName: isFromAdmin ? adminSenderName : customer.name,
       text: text,
       timestamp: DateTime.now(),
       attachmentName: attachmentName,

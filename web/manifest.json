@@ -1,11 +1,11 @@
 {
-    "name": "DemirtürkApp",
-    "short_name": "DemirtürkApp",
+    "name": "Demirtürk Mobil",
+    "short_name": "Demirtürk Mobil",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#1C2126",
     "theme_color": "#1C2126",
-    "description": "DemirtürkApp • Demirtürk İnşaat Elden Senet & Müşteri Portalı",
+    "description": "Demirtürk Mobil • Demirtürk İnşaat Elden Senet & Müşteri Portalı",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

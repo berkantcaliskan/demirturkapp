@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../widgets/website_blurred_background.dart';
+import 'website_iframe_stub.dart'
+    if (dart.library.html) 'website_iframe_web.dart';
 
 class CustomerSupportScreen extends StatelessWidget {
   final AppState appState;
@@ -12,369 +14,262 @@ class CustomerSupportScreen extends StatelessWidget {
     required this.appState,
   });
 
+  static const String companyPhoneDisplay = '+90 543 667 34 54';
+  static const String companyPhoneTelUrl = 'tel:+905436673454';
+
   @override
   Widget build(BuildContext context) {
-    final tickets = appState.customerTickets;
+    final isDark = AppGlass.isDark(context);
+    final advisor = appState.currentSalesAdvisor;
+    final financeTicket = appState.customerTickets
+        .where((t) => t.channel == 'finance')
+        .firstOrNull;
+    final advisorTicket = appState.customerTickets
+        .where((t) => t.channel == 'advisor')
+        .firstOrNull;
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
-        // Company Direct Contact Card (iOS Frosted Glass)
-        GlassCard(
-          borderRadius: 22,
-          padding: const EdgeInsets.all(18),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 42,
-                    height: 42,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A84FF).withValues(alpha: 0.25),
-                      borderRadius: BorderRadius.circular(13),
-                      border: Border.all(
-                        color: const Color(0xFF64D2FF).withValues(alpha: 0.5),
-                        width: 0.8,
-                      ),
-                    ),
-                    child: const Icon(
-                      CupertinoIcons.building_2_fill,
-                      color: Color(0xFF64D2FF),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Demirtürk İnşaat • Karasu',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -0.3,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Doğu Karadeniz Cd. No: 1, Aziziye, Karasu • 09:00 - 20:00',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppGlass.textSecondary(context),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildContactButton(
-                      context,
-                      icon: CupertinoIcons.chat_bubble_text_fill,
-                      label: 'WhatsApp Hattı',
-                      sublabel: '+90 531 373 00 54',
-                      color: const Color(0xFF30D158),
-                      message:
-                          'Demirtürk İnşaat WhatsApp Hattı (+90 531 373 00 54) açılıyor...',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildContactButton(
-                      context,
-                      icon: CupertinoIcons.phone_fill,
-                      label: 'Merkez Ofis',
-                      sublabel: '0264 718 00 54',
-                      color: const Color(0xFF64D2FF),
-                      message:
-                          'Demirtürk İnşaat Merkez Ofis (0264 718 00 54) aranıyor...',
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 18),
-
-        // Support Tickets Header + New Button
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Mesajlarım & Destek Talepleri',
-              style: TextStyle(
-                fontSize: 16.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: -0.4,
-                color: Colors.white,
-              ),
-            ),
-            IosGlassButton(
-              onTap: () => _showNewTicketSheet(context),
-              color: const Color(0xFFFF9F0A),
-              icon: CupertinoIcons.plus_bubble_fill,
-              label: 'Yeni Mesaj',
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-              borderRadius: 18,
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-
-        if (tickets.isEmpty)
-          GlassCard(
-            borderRadius: 22,
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              children: [
-                Icon(
-                  CupertinoIcons.chat_bubble_2,
-                  size: 44,
-                  color: AppGlass.textMuted(context),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Henüz aktif bir destek talebiniz bulunmuyor.',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Senet vadesi, ödeme bildirimi veya yapılandırma talepleriniz için "Yeni Mesaj" butonuna tıklayabilirsiniz.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12.5,
-                    color: AppGlass.textSecondary(context),
-                  ),
-                ),
-              ],
-            ),
-          )
-        else
-          ...tickets.map((ticket) {
-            final lastMessage =
-                ticket.messages.isNotEmpty ? ticket.messages.last : null;
-            return GlassCard(
-              margin: const EdgeInsets.only(bottom: 12),
-              borderRadius: 20,
-              child: CupertinoButton(
-                padding: const EdgeInsets.all(16),
-                pressedOpacity: 0.7,
-                onPressed: () => showTicketChatModal(
-                  context,
-                  appState: appState,
-                  ticketId: ticket.id,
-                  isAdminMode: false,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF0A84FF).withValues(alpha: 0.24),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: const Color(0xFF64D2FF)
-                                  .withValues(alpha: 0.45),
-                              width: 0.6,
-                            ),
-                          ),
-                          child: Text(
-                            ticket.category,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF64D2FF),
-                            ),
-                          ),
-                        ),
-                        if (ticket.relatedSenetNo != null) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 9,
-                              vertical: 3.5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppGlass.subtleSurface(context),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.22),
-                                width: 0.6,
-                              ),
-                            ),
-                            child: Text(
-                              ticket.relatedSenetNo!,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 3.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: ticket.isResolved
-                                ? const Color(0xFF30D158).withValues(alpha: 0.22)
-                                : const Color(0xFFFF9F0A)
-                                    .withValues(alpha: 0.22),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: ticket.isResolved
-                                  ? const Color(0xFF30D158)
-                                      .withValues(alpha: 0.5)
-                                  : const Color(0xFFFFD60A)
-                                      .withValues(alpha: 0.5),
-                              width: 0.6,
-                            ),
-                          ),
-                          child: Text(
-                            ticket.isResolved ? 'Çözüldü' : 'Açık Talep',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: ticket.isResolved
-                                  ? const Color(0xFF30D158)
-                                  : const Color(0xFFFFD60A),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      ticket.subject,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        letterSpacing: -0.3,
-                        color: Colors.white,
-                      ),
-                    ),
-                    if (lastMessage != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        '${lastMessage.isFromAdmin ? "Şirket Yetkilisi" : "Siz"}: ${lastMessage.text}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppGlass.textSecondary(context),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Son mesaj: ${formatShortDate(ticket.updatedAt)}',
-                          style: TextStyle(
-                            fontSize: 11.5,
-                            color: AppGlass.textMuted(context),
-                          ),
-                        ),
-                        const Row(
-                          children: [
-                            Text(
-                              'Konuşmayı Aç',
-                              style: TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF64D2FF),
-                              ),
-                            ),
-                            SizedBox(width: 4),
-                            Icon(
-                              CupertinoIcons.chevron_forward,
-                              size: 14,
-                              color: Color(0xFF64D2FF),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+        // 1. Müşteriye Özel Atanmış Satış Danışmanı Kartı
+        // ("Satış Danışmanım" ince fontla üstte, danışman adı büyük kalın fontla altta, sağda otomatik güncellenen danışman fotoğrafı)
+        _AssignedSalesAdvisorCard(
+          advisor: advisor,
+          lastMessage: advisorTicket?.messages.lastOrNull,
+          isDark: isDark,
+          onMessageTap: () {
+            final ticket = appState.getOrCreateChannelTicket('advisor');
+            showTicketChatModal(
+              context,
+              appState: appState,
+              ticketId: ticket.id,
+              isAdminMode: false,
             );
-          }),
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // 2. Muhasebe İletişim Kısmı ("Finans Uzmanımız ile görüşün")
+        _FinanceSpecialistCard(
+          isDark: isDark,
+          lastMessage: financeTicket?.messages.lastOrNull,
+          onTap: () {
+            final ticket = appState.getOrCreateChannelTicket('finance');
+            showTicketChatModal(
+              context,
+              appState: appState,
+              ticketId: ticket.id,
+              isAdminMode: false,
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+
+        // 3. Alt Kısım: "Şimdi bir yetkiliyle mesajlaş" (Genel şirket paneline düşer) + Yanında "Ara" (+90 543 667 34 54)
+        _GeneralCompanyActionRow(
+          isDark: isDark,
+          phoneDisplay: companyPhoneDisplay,
+          onMessageRepresentativeTap: () {
+            final ticket = appState.getOrCreateChannelTicket('general');
+            showTicketChatModal(
+              context,
+              appState: appState,
+              ticketId: ticket.id,
+              isAdminMode: false,
+            );
+          },
+          onCallTap: () {
+            launchPhoneDialer(companyPhoneTelUrl);
+          },
+        ),
       ],
     );
   }
+}
 
-  Widget _buildContactButton(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    required String sublabel,
-    required Color color,
-    required String message,
-  }) {
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      pressedOpacity: 0.7,
-      onPressed: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
+class _AssignedSalesAdvisorCard extends StatelessWidget {
+  final SalesAdvisor advisor;
+  final ChatMessage? lastMessage;
+  final bool isDark;
+  final VoidCallback onMessageTap;
+
+  const _AssignedSalesAdvisorCard({
+    required this.advisor,
+    required this.lastMessage,
+    required this.isDark,
+    required this.onMessageTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = isDark ? const Color(0xFFF5F3F0) : const Color(0xFF1E293B);
+    final subTextColor =
+        isDark ? const Color(0xFF9C958C) : const Color(0xFF64748B);
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+        constraints: const BoxConstraints(minHeight: 196),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.16),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: color.withValues(alpha: 0.45), width: 0.7),
+          color: isDark ? const Color(0xFF211F1D) : Colors.white,
+          borderRadius: BorderRadius.circular(26),
         ),
-        child: Row(
+        child: Stack(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                      color: Colors.white,
+            // Sağda danışmanın fotoğrafı (danışman fotoğrafını güncelledikçe otomatik güncellenir)
+            Positioned(
+              top: 0,
+              right: 0,
+              bottom: 0,
+              width: 195,
+              child: ClipRect(
+                child: ShaderMask(
+                  shaderCallback: (rect) {
+                    return const LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Color(0x00FFFFFF),
+                        Color(0x00FFFFFF),
+                        Color(0x0AFFFFFF),
+                        Color(0x29FFFFFF),
+                        Color(0x66FFFFFF),
+                        Color(0xB3FFFFFF),
+                        Color(0xEBFFFFFF),
+                        Color(0xFFFFFFFF),
+                        Color(0xFFFFFFFF),
+                      ],
+                      stops: [
+                        0.00,
+                        0.04,
+                        0.09,
+                        0.16,
+                        0.25,
+                        0.35,
+                        0.44,
+                        0.52,
+                        1.00,
+                      ],
+                    ).createShader(rect);
+                  },
+                  blendMode: BlendMode.dstIn,
+                  child: Image.network(
+                  advisor.photoUrl,
+                  key: ValueKey<String>(
+                    '${advisor.id}_${advisor.photoUrl}_${advisor.photoUpdatedAt.millisecondsSinceEpoch}',
+                  ),
+                  fit: BoxFit.cover,
+                  alignment: const Alignment(0.0, -0.25),
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: isDark
+                          ? const Color(0xFF2B2825)
+                          : const Color(0xFFE2E8F0),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 28),
+                      child: Icon(
+                        CupertinoIcons.person_crop_circle_fill,
+                        size: 74,
+                        color: subTextColor.withValues(alpha: 0.45),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+
+            // İnce kart kenarlığı
+            Positioned.fill(
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFFFFF8F0).withValues(alpha: 0.08)
+                          : const Color(0xFF0F172A).withValues(alpha: 0.05),
+                      width: 0.7,
                     ),
                   ),
-                  Text(
-                    sublabel,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppGlass.textSecondary(context),
+                ),
+              ),
+            ),
+
+            // Sol Ön Yüz İçerik: Üstte ince fontla "Satış Danışmanım", altında büyük kalın fontla Danışman Adı
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 130, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Satış Danışmanım',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w400,
+                          height: 1.2,
+                          letterSpacing: -0.1,
+                          color: subTextColor,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        advisor.name,
+                        style: TextStyle(
+                          fontSize: 23,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          letterSpacing: -0.5,
+                          color: textColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 46),
+                  CupertinoButton(
+                    padding: EdgeInsets.zero,
+                    minimumSize: Size.zero,
+                    pressedOpacity: 0.8,
+                    onPressed: onMessageTap,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFFF5F3F0)
+                            : const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.chat_bubble_text_fill,
+                            size: 13.5,
+                            color: isDark
+                                ? const Color(0xFF141312)
+                                : Colors.white,
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            'Danışmanla Görüş',
+                            style: TextStyle(
+                              color: isDark
+                                  ? const Color(0xFF141312)
+                                  : Colors.white,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -385,232 +280,242 @@ class CustomerSupportScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _showNewTicketSheet(BuildContext context) {
-    final subjectCtrl = TextEditingController();
-    final msgCtrl = TextEditingController();
-    String selectedCategory = 'Vade & Ödeme Planı';
-    String? selectedSenetNo = appState.customerNotes.isNotEmpty
-        ? appState.customerNotes.first.senetNo
-        : null;
+class _FinanceSpecialistCard extends StatelessWidget {
+  final bool isDark;
+  final ChatMessage? lastMessage;
+  final VoidCallback onTap;
 
-    final categories = [
-      'Vade & Ödeme Planı',
-      'Dekont & Tahsilat',
-      'Senet Yapılandırma / Erteleme',
-      'Hesap Ekstresi & Borç Mutabakatı',
-      'Diğer Konular',
-    ];
+  const _FinanceSpecialistCard({
+    required this.isDark,
+    required this.lastMessage,
+    required this.onTap,
+  });
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: IosGlassSheet(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      borderRadius: 24,
+      padding: EdgeInsets.zero,
+      child: CupertinoButton(
+        padding: const EdgeInsets.all(18),
+        pressedOpacity: 0.78,
+        onPressed: onTap,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppGlass.subtleSurface(context),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: AppGlass.dividerColor(context),
+                      width: 0.7,
+                    ),
+                  ),
+                  child: Icon(
+                    CupertinoIcons.briefcase_fill,
+                    size: 20,
+                    color: AppGlass.textPrimary(context),
+                  ),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
                   child: Column(
-                    mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          const Icon(
-                            CupertinoIcons.plus_bubble_fill,
-                            color: Color(0xFF64D2FF),
-                          ),
-                          const SizedBox(width: 10),
-                          const Expanded(
-                            child: Text(
-                              'Şirkete Yeni Mesaj / Destek Talebi',
-                              style: TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            onPressed: () => Navigator.pop(ctx),
-                            child: Icon(
-                              CupertinoIcons.xmark_circle_fill,
-                              color: Colors.white.withValues(alpha: 0.6),
-                              size: 24,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Konu Kategorisi',
+                      Text(
+                        'Finans Uzmanımız ile görüşün',
                         style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
+                          fontSize: 16.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.35,
+                          color: AppGlass.textPrimary(context),
                         ),
                       ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: categories.map((c) {
-                          final active = c == selectedCategory;
-                          return CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            onPressed: () =>
-                                setModalState(() => selectedCategory = c),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 7,
-                              ),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? const Color(0xFF0A84FF)
-                                        .withValues(alpha: 0.85)
-                                    : Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(
-                                  color: active
-                                      ? Colors.white.withValues(alpha: 0.6)
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: 0.7,
-                                ),
-                              ),
-                              child: Text(
-                                c,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Konu Başlığı',
+                      const SizedBox(height: 3),
+                      Text(
+                        'Muhasebe & Finans Birimi • Doğrudan İletişim',
                         style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      CupertinoTextField(
-                        controller: subjectCtrl,
-                        placeholder: 'Örn: Kasım Ayı Senet Ödemesi Hakkında',
-                        placeholderStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.45),
-                          fontSize: 13.5,
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.24),
-                            width: 0.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Mesajınız',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      CupertinoTextField(
-                        controller: msgCtrl,
-                        maxLines: 3,
-                        placeholder:
-                            'Şirket yetkilisine iletmek istediğiniz mesajı yazınız...',
-                        placeholderStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.45),
-                          fontSize: 13.5,
-                        ),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.24),
-                            width: 0.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: IosGlassButton(
-                          icon: CupertinoIcons.paperplane_fill,
-                          label: 'Mesajı Şirkete Gönder',
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          onTap: () {
-                            if (subjectCtrl.text.trim().isEmpty ||
-                                msgCtrl.text.trim().isEmpty) {
-                              return;
-                            }
-                            final created = appState.createSupportTicket(
-                              subject: subjectCtrl.text.trim(),
-                              category: selectedCategory,
-                              relatedSenetNo: selectedSenetNo,
-                              initialMessage: msgCtrl.text.trim(),
-                            );
-                            Navigator.pop(ctx);
-                            showTicketChatModal(
-                              context,
-                              appState: appState,
-                              ticketId: created.id,
-                              isAdminMode: false,
-                            );
-                          },
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppGlass.textMuted(context),
                         ),
                       ),
                     ],
                   ),
                 ),
+                Icon(
+                  CupertinoIcons.chevron_forward,
+                  size: 16,
+                  color: AppGlass.textSecondary(context),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
+              decoration: BoxDecoration(
+                color: AppGlass.subtleSurface(context),
+                borderRadius: BorderRadius.circular(15),
               ),
-            );
-          },
-        );
-      },
+              child: Row(
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF30D158),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 9),
+                  Expanded(
+                    child: Text(
+                      lastMessage != null
+                          ? '${lastMessage!.isFromAdmin ? "Muhasebe" : "Siz"}: ${lastMessage!.text}'
+                          : 'Senet vadesi, dekont onayı ve ödeme planı için muhasebe üyesine doğrudan ulaşın.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        height: 1.35,
+                        color: AppGlass.textSecondary(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GeneralCompanyActionRow extends StatelessWidget {
+  final bool isDark;
+  final String phoneDisplay;
+  final VoidCallback onMessageRepresentativeTap;
+  final VoidCallback onCallTap;
+
+  const _GeneralCompanyActionRow({
+    required this.isDark,
+    required this.phoneDisplay,
+    required this.onMessageRepresentativeTap,
+    required this.onCallTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Sol: Şimdi bir yetkiliyle mesajlaş (Genel şirket paneline düşer)
+        Expanded(
+          child: GlassCard(
+            borderRadius: 22,
+            padding: EdgeInsets.zero,
+            child: CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              pressedOpacity: 0.78,
+              onPressed: onMessageRepresentativeTap,
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFFF5F3F0)
+                          : const Color(0xFF1E293B),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      CupertinoIcons.bubble_left_bubble_right_fill,
+                      size: 17,
+                      color: isDark ? const Color(0xFF141312) : Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Şimdi bir yetkiliyle mesajlaş',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.3,
+                            color: AppGlass.textPrimary(context),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Genel şirket paneline düşer, müsait yetkili yanıtlar',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppGlass.textMuted(context),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+
+        // Sağ: Ara (+90 543 667 34 54 - doğrudan telefona yönlendirir)
+        GlassCard(
+          borderRadius: 22,
+          padding: EdgeInsets.zero,
+          child: CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            pressedOpacity: 0.78,
+            onPressed: onCallTap,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF30D158).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    CupertinoIcons.phone_fill,
+                    size: 18,
+                    color: Color(0xFF30D158),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Ara',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
+                    color: AppGlass.textPrimary(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -622,288 +527,349 @@ void showTicketChatModal(
   required bool isAdminMode,
 }) {
   final msgController = TextEditingController();
+  bool replyAsStaffInDemo = isAdminMode;
 
-  showModalBottomSheet(
+  showGlassBottomSheet(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
-      return AnimatedBuilder(
-        animation: appState,
-        builder: (context, _) {
-          final ticket =
-              appState.allTickets.firstWhere((t) => t.id == ticketId);
-          final customer = appState.getCustomerById(ticket.customerId);
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return AnimatedBuilder(
+            animation: appState,
+            builder: (context, _) {
+              final isDark = AppGlass.isDark(context);
+              final ticket = appState.allTickets.firstWhere(
+                (t) => t.id == ticketId,
+                orElse: () => appState.allTickets.first,
+              );
+              final customer = appState.getCustomerById(ticket.customerId);
+              final advisor = appState.salesAdvisors.firstWhere(
+                (a) => a.id == customer.assignedAdvisorId,
+                orElse: () => appState.salesAdvisors.first,
+              );
 
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-            ),
-            child: IosGlassSheet(
-              maxHeightFactor: 0.84,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
+              final String headerTitle;
+              final String headerSubtitle;
+              final String staffRoleLabel;
+              if (ticket.channel == 'advisor') {
+                headerTitle = advisor.name;
+                headerSubtitle = 'Satış Danışmanım • ${customer.projectTitle}';
+                staffRoleLabel = 'Danışman Olarak Yanıtla';
+              } else if (ticket.channel == 'finance') {
+                headerTitle = 'Finans Uzmanımız';
+                headerSubtitle =
+                    'Muhasebe & Finans Birimi • İki Yönlü Doğrudan Görüşme';
+                staffRoleLabel = 'Muhasebe Olarak Yanıtla';
+              } else {
+                headerTitle = 'Canlı Yetkili Destek Hattı';
+                headerSubtitle =
+                    'Genel Şirket Paneli • Müsait yetkili anında yanıtlar';
+                staffRoleLabel = 'Yetkili Olarak Yanıtla';
+              }
+
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom,
+                ),
+                child: IosGlassSheet(
+                  maxHeightFactor: 0.84,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
+                        child: Column(
                           children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    ticket.subject,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15.5,
-                                      letterSpacing: -0.3,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '${customer.name} • ${ticket.category}${ticket.relatedSenetNo != null ? " • ${ticket.relatedSenetNo}" : ""}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color:
-                                          Colors.white.withValues(alpha: 0.7),
-                                    ),
-                                  ),
-                                ],
+                            Container(
+                              width: 40,
+                              height: 4.5,
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : const Color(0xFF0F172A)
+                                        .withValues(alpha: 0.16),
+                                borderRadius: BorderRadius.circular(10),
                               ),
                             ),
-                            if (isAdminMode)
-                              CupertinoButton(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                minimumSize: Size.zero,
-                                onPressed: () =>
-                                    appState.toggleTicketResolved(ticket.id),
-                                child: Text(
-                                  ticket.isResolved
-                                      ? 'Yeniden Aç'
-                                      : 'Çözüldü İşaretle',
-                                  style: const TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF64D2FF),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                if (ticket.channel == 'advisor') ...[
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: SizedBox(
+                                      width: 40,
+                                      height: 40,
+                                      child: Image.network(
+                                        advisor.photoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          color: AppGlass.subtleSurface(context),
+                                          child: Icon(
+                                            CupertinoIcons.person_fill,
+                                            size: 20,
+                                            color:
+                                                AppGlass.textSecondary(context),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 11),
+                                ],
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        headerTitle,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                          letterSpacing: -0.3,
+                                          color: AppGlass.textPrimary(context),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        headerSubtitle,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              AppGlass.textSecondary(context),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+                                CupertinoButton(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 5,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  onPressed: () {
+                                    setModalState(() {
+                                      replyAsStaffInDemo = !replyAsStaffInDemo;
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppGlass.subtleSurface(context),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: AppGlass.dividerColor(context),
+                                        width: 0.6,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      replyAsStaffInDemo
+                                          ? staffRoleLabel
+                                          : 'Müşteri Görünümü',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppGlass.textSecondary(context),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                CupertinoButton(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: Icon(
+                                    CupertinoIcons.xmark_circle_fill,
+                                    color: AppGlass.textMuted(context),
+                                    size: 24,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Divider(
+                        height: 1,
+                        color: AppGlass.dividerColor(context),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: ticket.messages.length,
+                          itemBuilder: (context, index) {
+                            final msg = ticket.messages[index];
+                            final isMine = replyAsStaffInDemo
+                                ? msg.isFromAdmin
+                                : !msg.isFromAdmin;
+
+                            final bubbleBg = isMine
+                                ? (isDark
+                                    ? const Color(0xFFF5F3F0)
+                                    : const Color(0xFF1E293B))
+                                : AppGlass.subtleSurface(context);
+
+                            final bubbleText = isMine
+                                ? (isDark
+                                    ? const Color(0xFF141312)
+                                    : Colors.white)
+                                : AppGlass.textPrimary(context);
+
+                            final senderColor = isMine
+                                ? (isDark
+                                    ? const Color(0xFF141312)
+                                        .withValues(alpha: 0.65)
+                                    : Colors.white.withValues(alpha: 0.75))
+                                : AppGlass.textMuted(context);
+
+                            return Align(
+                              alignment: isMine
+                                  ? Alignment.centerRight
+                                  : Alignment.centerLeft,
+                              child: Container(
+                                constraints: BoxConstraints(
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.78,
+                                ),
+                                margin: const EdgeInsets.only(bottom: 12),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: bubbleBg,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(18),
+                                    topRight: const Radius.circular(18),
+                                    bottomLeft: Radius.circular(isMine ? 18 : 4),
+                                    bottomRight:
+                                        Radius.circular(isMine ? 4 : 18),
+                                  ),
+                                  border: Border.all(
+                                    color: AppGlass.dividerColor(context),
+                                    width: 0.6,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      msg.senderName,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: senderColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      msg.text,
+                                      style: TextStyle(
+                                        fontSize: 13.5,
+                                        height: 1.35,
+                                        color: bubbleText,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
+                            );
+                          },
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+                        decoration: BoxDecoration(
+                          color: AppGlass.subtleSurface(context),
+                          border: Border(
+                            top: BorderSide(
+                              color: AppGlass.dividerColor(context),
+                              width: 0.6,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: CupertinoTextField(
+                                controller: msgController,
+                                placeholder: replyAsStaffInDemo
+                                    ? '$staffRoleLabel mesajınızı yazın...'
+                                    : 'Mesajınızı yazın...',
+                                placeholderStyle: TextStyle(
+                                  color: AppGlass.textMuted(context),
+                                  fontSize: 13.5,
+                                ),
+                                style: TextStyle(
+                                  color: AppGlass.textPrimary(context),
+                                  fontSize: 14,
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 11,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFF211F1D)
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: AppGlass.dividerColor(context),
+                                    width: 0.7,
+                                  ),
+                                ),
+                                onSubmitted: (_) {
+                                  if (msgController.text.trim().isEmpty) return;
+                                  appState.sendTicketMessage(
+                                    ticketId: ticket.id,
+                                    text: msgController.text.trim(),
+                                    isFromAdmin: replyAsStaffInDemo,
+                                  );
+                                  msgController.clear();
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             CupertinoButton(
                               padding: EdgeInsets.zero,
                               minimumSize: Size.zero,
-                              onPressed: () => Navigator.pop(ctx),
-                              child: Icon(
-                                CupertinoIcons.xmark_circle_fill,
-                                color: Colors.white.withValues(alpha: 0.6),
-                                size: 24,
+                              onPressed: () {
+                                if (msgController.text.trim().isEmpty) return;
+                                appState.sendTicketMessage(
+                                  ticketId: ticket.id,
+                                  text: msgController.text.trim(),
+                                  isFromAdmin: replyAsStaffInDemo,
+                                );
+                                msgController.clear();
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isDark
+                                      ? const Color(0xFFF5F3F0)
+                                      : const Color(0xFF1E293B),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  CupertinoIcons.arrow_up,
+                                  color: isDark
+                                      ? const Color(0xFF141312)
+                                      : Colors.white,
+                                  size: 19,
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      ],
-                    ),
-                  ),
-                  Divider(
-                    height: 1,
-                    color: Colors.white.withValues(alpha: 0.16),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: ticket.messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = ticket.messages[index];
-                        final isMine =
-                            isAdminMode ? msg.isFromAdmin : !msg.isFromAdmin;
-
-                        return Align(
-                          alignment: isMine
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: Container(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  MediaQuery.of(context).size.width * 0.78,
-                            ),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: isMine
-                                    ? [
-                                        const Color(0xFF0A84FF)
-                                            .withValues(alpha: 0.88),
-                                        const Color(0xFF0066CC)
-                                            .withValues(alpha: 0.78),
-                                      ]
-                                    : [
-                                        Colors.white.withValues(alpha: 0.18),
-                                        Colors.white.withValues(alpha: 0.10),
-                                      ],
-                              ),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(18),
-                                topRight: const Radius.circular(18),
-                                bottomLeft: Radius.circular(isMine ? 18 : 4),
-                                bottomRight: Radius.circular(isMine ? 4 : 18),
-                              ),
-                              border: Border.all(
-                                color: Colors.white.withValues(
-                                  alpha: isMine ? 0.35 : 0.22,
-                                ),
-                                width: 0.7,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  msg.senderName,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                    color: isMine
-                                        ? Colors.white.withValues(alpha: 0.85)
-                                        : const Color(0xFF64D2FF),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  msg.text,
-                                  style: const TextStyle(
-                                    fontSize: 13.5,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                if (msg.attachmentName != null) ...[
-                                  const SizedBox(height: 8),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 10,
-                                      vertical: 6,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.20),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          CupertinoIcons.paperclip,
-                                          size: 14,
-                                          color: Colors.white,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Flexible(
-                                          child: Text(
-                                            msg.attachmentName!,
-                                            style: const TextStyle(
-                                              fontSize: 11.5,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.22),
-                      border: Border(
-                        top: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.16),
-                          width: 0.6,
-                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: CupertinoTextField(
-                            controller: msgController,
-                            placeholder: isAdminMode
-                                ? 'Şirket yetkilisi olarak yanıt yazın...'
-                                : 'iMessage tarzı mesajınızı yazın...',
-                            placeholderStyle: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.45),
-                              fontSize: 13.5,
-                            ),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 11,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 0.7,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        CupertinoButton(
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          onPressed: () {
-                            if (msgController.text.trim().isEmpty) return;
-                            appState.sendTicketMessage(
-                              ticketId: ticket.id,
-                              text: msgController.text.trim(),
-                              isFromAdmin: isAdminMode,
-                            );
-                            msgController.clear();
-                          },
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF0A84FF),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              CupertinoIcons.arrow_up,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       );

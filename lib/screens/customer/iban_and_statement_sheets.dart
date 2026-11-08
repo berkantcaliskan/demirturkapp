@@ -6,11 +6,14 @@ import '../../services/app_state.dart';
 import '../../widgets/website_blurred_background.dart';
 
 void showIbanSheet(BuildContext context, AppState appState) {
-  showModalBottomSheet(
+  showGlassBottomSheet(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
+      final isDark = AppGlass.isDark(ctx);
+      final textPrimary = AppGlass.textPrimary(ctx);
+      final textSecondary = AppGlass.textSecondary(ctx);
+      final textMuted = AppGlass.textMuted(ctx);
+
       return IosGlassSheet(
         maxHeightFactor: 0.85,
         child: Column(
@@ -21,7 +24,9 @@ void showIbanSheet(BuildContext context, AppState appState) {
               width: 40,
               height: 4.5,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.35),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.28)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -33,16 +38,16 @@ void showIbanSheet(BuildContext context, AppState appState) {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0A84FF).withValues(alpha: 0.25),
+                      color: AppGlass.subtleSurface(ctx),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: const Color(0xFF64D2FF).withValues(alpha: 0.45),
+                        color: AppGlass.dividerColor(ctx),
                         width: 0.7,
                       ),
                     ),
-                    child: const Icon(
+                    child: Icon(
                       CupertinoIcons.building_2_fill,
-                      color: Color(0xFF64D2FF),
+                      color: textPrimary,
                       size: 20,
                     ),
                   ),
@@ -51,20 +56,20 @@ void showIbanSheet(BuildContext context, AppState appState) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Şirket Banka & IBAN Bilgileri',
                           style: TextStyle(
                             fontSize: 16.5,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
-                            color: Colors.white,
+                            color: textPrimary,
                           ),
                         ),
                         Text(
                           'FAST / EFT / Havale açıklamasına Senet No yazınız',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: textMuted,
                           ),
                         ),
                       ],
@@ -76,14 +81,14 @@ void showIbanSheet(BuildContext context, AppState appState) {
                     onPressed: () => Navigator.pop(ctx),
                     child: Icon(
                       CupertinoIcons.xmark_circle_fill,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: textMuted,
                       size: 24,
                     ),
                   ),
                 ],
               ),
             ),
-            Divider(height: 1, color: Colors.white.withValues(alpha: 0.16)),
+            Divider(height: 1, color: AppGlass.dividerColor(ctx)),
             Flexible(
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -93,28 +98,28 @@ void showIbanSheet(BuildContext context, AppState appState) {
                     padding: const EdgeInsets.all(13),
                     margin: const EdgeInsets.only(bottom: 14),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF0A84FF).withValues(alpha: 0.18),
+                      color: AppGlass.subtleSurface(ctx),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: const Color(0xFF64D2FF).withValues(alpha: 0.4),
+                        color: AppGlass.dividerColor(ctx),
                         width: 0.7,
                       ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           CupertinoIcons.info_circle_fill,
-                          color: Color(0xFF64D2FF),
+                          color: textSecondary,
                           size: 20,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Alıcı Unvanı: ${appState.bankAccounts.first.accountHolder}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                              color: textPrimary,
                             ),
                           ),
                         ),
@@ -149,10 +154,10 @@ void showIbanSheet(BuildContext context, AppState appState) {
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: AppGlass.subtleSurface(ctx),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.25),
+                          color: AppGlass.dividerColor(ctx),
                           width: 0.7,
                         ),
                       ),
@@ -173,11 +178,11 @@ void showIbanSheet(BuildContext context, AppState appState) {
                               Expanded(
                                 child: Text(
                                   bank.bankName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w700,
                                     letterSpacing: -0.3,
-                                    color: Colors.white,
+                                    color: textPrimary,
                                   ),
                                 ),
                               ),
@@ -187,14 +192,14 @@ void showIbanSheet(BuildContext context, AppState appState) {
                                   vertical: 4,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.12),
+                                  color: AppGlass.subtleSurface(ctx),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   bank.branchName,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white.withValues(alpha: 0.8),
+                                    color: textSecondary,
                                   ),
                                 ),
                               ),
@@ -207,10 +212,12 @@ void showIbanSheet(BuildContext context, AppState appState) {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.black.withValues(alpha: 0.22),
+                              color: isDark
+                                  ? Colors.black.withValues(alpha: 0.22)
+                                  : Colors.white.withValues(alpha: 0.75),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.18),
+                                color: AppGlass.dividerColor(ctx),
                                 width: 0.6,
                               ),
                             ),
@@ -219,12 +226,12 @@ void showIbanSheet(BuildContext context, AppState appState) {
                                 Expanded(
                                   child: Text(
                                     bank.iban,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.4,
-                                      fontFamily: 'monospace',
-                                      color: Colors.white,
+                                      fontFamily: 'Plus Jakarta Sans',
+                                      color: textPrimary,
                                     ),
                                   ),
                                 ),
@@ -311,13 +318,18 @@ void showUploadReceiptSheet(
     'vezne_tahsilat_fisi.png',
   ];
 
-  showModalBottomSheet(
+  showGlassBottomSheet(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
       return StatefulBuilder(
         builder: (context, setModalState) {
+          final isDark = AppGlass.isDark(context);
+          final textPrimary = AppGlass.textPrimary(context);
+          final textSecondary = AppGlass.textSecondary(context);
+          final textMuted = AppGlass.textMuted(context);
+          final activeBg = isDark ? Colors.white : const Color(0xFF1E293B);
+          final activeFg = isDark ? const Color(0xFF0F172A) : Colors.white;
+
           return Padding(
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -334,7 +346,9 @@ void showUploadReceiptSheet(
                         width: 40,
                         height: 4.5,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.35),
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.28)
+                              : const Color(0xFF0F172A).withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -346,18 +360,16 @@ void showUploadReceiptSheet(
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF30D158).withValues(alpha: 0.24),
+                            color: AppGlass.subtleSurface(context),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: const Color(0xFF30D158)
-                                  .withValues(alpha: 0.5),
+                              color: AppGlass.dividerColor(context),
                               width: 0.7,
                             ),
                           ),
-                          child: const Icon(
+                          child: Icon(
                             CupertinoIcons.arrow_up_doc_fill,
-                            color: Color(0xFF30D158),
+                            color: textPrimary,
                             size: 20,
                           ),
                         ),
@@ -366,20 +378,20 @@ void showUploadReceiptSheet(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 'Dekont Yükle & Ödeme Bildir',
                                 style: TextStyle(
                                   fontSize: 16.5,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: -0.3,
-                                  color: Colors.white,
+                                  color: textPrimary,
                                 ),
                               ),
                               Text(
                                 'Ödeme belgenizi yükleyin, muhasebe onayına iletilsin',
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: Colors.white.withValues(alpha: 0.7),
+                                  color: textMuted,
                                 ),
                               ),
                             ],
@@ -391,19 +403,19 @@ void showUploadReceiptSheet(
                           onPressed: () => Navigator.pop(ctx),
                           child: Icon(
                             CupertinoIcons.xmark_circle_fill,
-                            color: Colors.white.withValues(alpha: 0.6),
+                            color: textMuted,
                             size: 24,
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Text(
+                    Text(
                       'İlgili Senet Seçimi',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -428,22 +440,21 @@ void showUploadReceiptSheet(
                               ),
                               decoration: BoxDecoration(
                                 color: active
-                                    ? const Color(0xFF0A84FF)
-                                        .withValues(alpha: 0.85)
-                                    : Colors.white.withValues(alpha: 0.12),
+                                    ? activeBg
+                                    : AppGlass.subtleSurface(context),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
                                   color: active
-                                      ? Colors.white.withValues(alpha: 0.6)
-                                      : Colors.white.withValues(alpha: 0.2),
+                                      ? activeBg
+                                      : AppGlass.dividerColor(context),
                                   width: 0.7,
                                 ),
                               ),
                               child: Center(
                                 child: Text(
                                   '${note.senetNo} • ${formatCurrency(note.amount)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
+                                  style: TextStyle(
+                                    color: active ? activeFg : textPrimary,
                                     fontSize: 12.5,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -455,12 +466,12 @@ void showUploadReceiptSheet(
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Ödeme Yöntemi / Banka',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -481,21 +492,20 @@ void showUploadReceiptSheet(
                             ),
                             decoration: BoxDecoration(
                               color: active
-                                  ? const Color(0xFF0A84FF)
-                                      .withValues(alpha: 0.85)
-                                  : Colors.white.withValues(alpha: 0.12),
+                                  ? activeBg
+                                  : AppGlass.subtleSurface(context),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: active
-                                    ? Colors.white.withValues(alpha: 0.6)
-                                    : Colors.white.withValues(alpha: 0.2),
+                                    ? activeBg
+                                    : AppGlass.dividerColor(context),
                                 width: 0.7,
                               ),
                             ),
                             child: Text(
                               b,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: active ? activeFg : textPrimary,
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                               ),
@@ -505,31 +515,30 @@ void showUploadReceiptSheet(
                       }).toList(),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Dekont Dosyası (PDF veya Görsel)',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF30D158).withValues(alpha: 0.18),
+                        color: AppGlass.subtleSurface(context),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color:
-                              const Color(0xFF30D158).withValues(alpha: 0.45),
+                          color: AppGlass.dividerColor(context),
                           width: 0.7,
                         ),
                       ),
                       child: Row(
                         children: [
-                          const Icon(
+                          Icon(
                             CupertinoIcons.doc_fill,
-                            color: Color(0xFF30D158),
+                            color: textPrimary,
                             size: 26,
                           ),
                           const SizedBox(width: 10),
@@ -539,17 +548,17 @@ void showUploadReceiptSheet(
                               children: [
                                 Text(
                                   selectedFileName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13.5,
-                                    color: Colors.white,
+                                    color: textPrimary,
                                   ),
                                 ),
                                 Text(
                                   'Dekont belgesi eklemeye hazır (245 KB)',
                                   style: TextStyle(
                                     fontSize: 11.5,
-                                    color: Colors.white.withValues(alpha: 0.75),
+                                    color: textMuted,
                                   ),
                                 ),
                               ],
@@ -576,12 +585,12 @@ void showUploadReceiptSheet(
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Açıklama / Not (İsteğe Bağlı)',
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
-                        color: Colors.white70,
+                        color: textSecondary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -591,19 +600,19 @@ void showUploadReceiptSheet(
                       placeholder:
                           'Örn: Eşimin hesabından gönderildi, açıklama kısmına senet no yazıldı...',
                       placeholderStyle: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.45),
+                        color: textMuted,
                         fontSize: 13,
                       ),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: textPrimary,
                         fontSize: 13.5,
                       ),
                       padding: const EdgeInsets.all(13),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.12),
+                        color: AppGlass.subtleSurface(context),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.24),
+                          color: AppGlass.dividerColor(context),
                           width: 0.7,
                         ),
                       ),
@@ -613,7 +622,6 @@ void showUploadReceiptSheet(
                       width: double.infinity,
                       child: IosGlassButton(
                         icon: CupertinoIcons.paperplane_fill,
-                        color: const Color(0xFF30D158),
                         label:
                             '${formatCurrency(selectedNote.amount)} Ödeme Bildirimini Gönder',
                         padding: const EdgeInsets.symmetric(vertical: 14),
@@ -657,11 +665,14 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
   final paid = appState.getCustomerPaidAmount(customer.id);
   final remaining = appState.getCustomerRemainingAmount(customer.id);
 
-  showModalBottomSheet(
+  showGlassBottomSheet(
     context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
+      final isDark = AppGlass.isDark(ctx);
+      final textPrimary = AppGlass.textPrimary(ctx);
+      final textSecondary = AppGlass.textSecondary(ctx);
+      final textMuted = AppGlass.textMuted(ctx);
+
       return IosGlassSheet(
         maxHeightFactor: 0.88,
         child: Column(
@@ -671,7 +682,9 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
               width: 40,
               height: 4.5,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.35),
+                color: isDark
+                    ? Colors.white.withValues(alpha: 0.28)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
@@ -679,9 +692,9 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
               padding: const EdgeInsets.fromLTRB(20, 14, 14, 10),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     CupertinoIcons.doc_richtext,
-                    color: Color(0xFF64D2FF),
+                    color: textPrimary,
                     size: 24,
                   ),
                   const SizedBox(width: 10),
@@ -689,20 +702,20 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Müşteri Cari & Senet Hesap Ekstresi',
                           style: TextStyle(
                             fontSize: 16.5,
                             fontWeight: FontWeight.w700,
                             letterSpacing: -0.3,
-                            color: Colors.white,
+                            color: textPrimary,
                           ),
                         ),
                         Text(
                           'Sözleşme No: ${customer.contractNo} • Tarih: 05.11.2026',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: textMuted,
                           ),
                         ),
                       ],
@@ -714,14 +727,14 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                     onPressed: () => Navigator.pop(ctx),
                     child: Icon(
                       CupertinoIcons.xmark_circle_fill,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: textMuted,
                       size: 24,
                     ),
                   ),
                 ],
               ),
             ),
-            Divider(height: 1, color: Colors.white.withValues(alpha: 0.16)),
+            Divider(height: 1, color: AppGlass.dividerColor(ctx)),
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(18),
@@ -729,55 +742,62 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: AppGlass.subtleSurface(ctx),
                       borderRadius: BorderRadius.circular(18),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.24),
+                        color: AppGlass.dividerColor(ctx),
                         width: 0.7,
                       ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'DEMİRTÜRK İNŞAAT & YAPI MALZ. SAN. TİC. LTD. ŞTİ. - RESMİ SENET ÇİZELGESİ',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF64D2FF),
+                            color: textSecondary,
                             letterSpacing: 0.4,
                           ),
                         ),
                         const SizedBox(height: 10),
-                        _buildInfoRow('Müşteri / Unvan:', customer.name),
-                        _buildInfoRow('TCKN / VKN:', customer.tcOrTaxNo),
-                        _buildInfoRow('Telefon:', customer.phone),
-                        _buildInfoRow('Sözleşme Kodu:', customer.contractNo),
+                        _buildInfoRow(ctx, 'Müşteri / Unvan:', customer.name),
+                        _buildInfoRow(ctx, 'TCKN / VKN:', customer.tcOrTaxNo),
+                        _buildInfoRow(ctx, 'Telefon:', customer.phone),
+                        _buildInfoRow(
+                          ctx,
+                          'Sözleşme Kodu:',
+                          customer.contractNo,
+                        ),
                         Divider(
                           height: 20,
-                          color: Colors.white.withValues(alpha: 0.16),
+                          color: AppGlass.dividerColor(ctx),
                         ),
                         Row(
                           children: [
                             Expanded(
                               child: _buildStatMini(
+                                ctx,
                                 'Toplam Senet',
                                 formatCurrency(total),
-                                Colors.white,
+                                textPrimary,
                               ),
                             ),
                             Expanded(
                               child: _buildStatMini(
+                                ctx,
                                 'Ödenen',
                                 formatCurrency(paid),
-                                const Color(0xFF30D158),
+                                const Color(0xFF10B981),
                               ),
                             ),
                             Expanded(
                               child: _buildStatMini(
+                                ctx,
                                 'Kalan Borç',
                                 formatCurrency(remaining),
-                                const Color(0xFFFF453A),
+                                const Color(0xFFE11D48),
                               ),
                             ),
                           ],
@@ -786,12 +806,12 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Senet / Taksit Detay Listesi',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: textPrimary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -803,10 +823,10 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                         vertical: 12,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.10),
+                        color: AppGlass.subtleSurface(ctx),
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.18),
+                          color: AppGlass.dividerColor(ctx),
                           width: 0.6,
                         ),
                       ),
@@ -817,10 +837,10 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                             height: 36,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: n.status.bgColor,
+                              color: AppGlass.subtleSurface(ctx),
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: n.status.color.withValues(alpha: 0.45),
+                                color: AppGlass.dividerColor(ctx),
                                 width: 0.6,
                               ),
                             ),
@@ -829,7 +849,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
-                                color: n.status.color,
+                                color: textPrimary,
                               ),
                             ),
                           ),
@@ -840,10 +860,10 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                               children: [
                                 Text(
                                   '${n.senetNo} • Vade: ${formatShortDate(n.dueDate)}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13,
-                                    color: Colors.white,
+                                    color: textPrimary,
                                   ),
                                 ),
                                 Text(
@@ -852,7 +872,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                                       : n.description,
                                   style: TextStyle(
                                     fontSize: 11.5,
-                                    color: Colors.white.withValues(alpha: 0.7),
+                                    color: textMuted,
                                   ),
                                 ),
                               ],
@@ -863,10 +883,10 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                             children: [
                               Text(
                                 formatCurrency(n.amount),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13.5,
-                                  color: Colors.white,
+                                  color: textPrimary,
                                 ),
                               ),
                               const SizedBox(height: 2),
@@ -875,7 +895,9 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: n.status.color,
+                                  color: n.status == NoteStatus.overdue
+                                      ? const Color(0xFFE11D48)
+                                      : textSecondary,
                                 ),
                               ),
                             ],
@@ -931,7 +953,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            backgroundColor: const Color(0xFF0A84FF),
+                            backgroundColor: const Color(0xFF1E293B),
                             content: Text(
                               '${customer.contractNo}_Hesap_Ekstresi.pdf cihazınıza indirildi.',
                             ),
@@ -951,7 +973,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
   );
 }
 
-Widget _buildInfoRow(String label, String value) {
+Widget _buildInfoRow(BuildContext context, String label, String value) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 4),
     child: Row(
@@ -962,17 +984,17 @@ Widget _buildInfoRow(String label, String value) {
             label,
             style: TextStyle(
               fontSize: 12.5,
-              color: Colors.white.withValues(alpha: 0.65),
+              color: AppGlass.textMuted(context),
             ),
           ),
         ),
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w600,
-              color: Colors.white,
+              color: AppGlass.textPrimary(context),
             ),
           ),
         ),
@@ -981,7 +1003,12 @@ Widget _buildInfoRow(String label, String value) {
   );
 }
 
-Widget _buildStatMini(String title, String value, Color color) {
+Widget _buildStatMini(
+  BuildContext context,
+  String title,
+  String value,
+  Color color,
+) {
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
@@ -989,7 +1016,7 @@ Widget _buildStatMini(String title, String value, Color color) {
         title,
         style: TextStyle(
           fontSize: 11,
-          color: Colors.white.withValues(alpha: 0.65),
+          color: AppGlass.textMuted(context),
         ),
       ),
       const SizedBox(height: 2),
@@ -1007,11 +1034,15 @@ Widget _buildStatMini(String title, String value, Color color) {
 
 void showNotificationsSheet(BuildContext context, AppState appState) {
   appState.markAllNotificationsRead();
-  showModalBottomSheet(
+  showGlassBottomSheet(
     context: context,
-    backgroundColor: Colors.transparent,
     builder: (ctx) {
+      final isDark = AppGlass.isDark(ctx);
+      final textPrimary = AppGlass.textPrimary(ctx);
+      final textSecondary = AppGlass.textSecondary(ctx);
+      final textMuted = AppGlass.textMuted(ctx);
       final list = appState.customerNotifications;
+
       return IosGlassSheet(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 26),
@@ -1022,26 +1053,28 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                 width: 40,
                 height: 4.5,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.35),
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.28)
+                      : const Color(0xFF0F172A).withValues(alpha: 0.16),
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
               const SizedBox(height: 14),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     CupertinoIcons.bell_fill,
-                    color: Color(0xFF64D2FF),
+                    color: textPrimary,
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Bildirimler & Vade Hatırlatmaları',
                       style: TextStyle(
                         fontSize: 16.5,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,
-                        color: Colors.white,
+                        color: textPrimary,
                       ),
                     ),
                   ),
@@ -1051,19 +1084,19 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                     onPressed: () => Navigator.pop(ctx),
                     child: Icon(
                       CupertinoIcons.xmark_circle_fill,
-                      color: Colors.white.withValues(alpha: 0.6),
+                      color: textMuted,
                       size: 24,
                     ),
                   ),
                 ],
               ),
-              Divider(color: Colors.white.withValues(alpha: 0.16)),
+              Divider(color: AppGlass.dividerColor(ctx)),
               if (list.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(24),
+                Padding(
+                  padding: const EdgeInsets.all(24),
                   child: Text(
                     'Henüz bildiriminiz bulunmuyor.',
-                    style: TextStyle(color: Colors.white70),
+                    style: TextStyle(color: textMuted),
                   ),
                 )
               else
@@ -1073,21 +1106,21 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                     itemCount: list.length,
                     separatorBuilder: (_, _) => Divider(
                       height: 16,
-                      color: Colors.white.withValues(alpha: 0.14),
+                      color: AppGlass.dividerColor(ctx),
                     ),
                     itemBuilder: (context, index) {
                       final item = list[index];
                       IconData icon = CupertinoIcons.bell_fill;
-                      Color color = const Color(0xFF64D2FF);
+                      Color color = textPrimary;
                       if (item.type == 'overdue') {
                         icon = CupertinoIcons.exclamationmark_triangle_fill;
-                        color = const Color(0xFFFF453A);
+                        color = const Color(0xFFE11D48);
                       } else if (item.type == 'approved') {
                         icon = CupertinoIcons.checkmark_seal_fill;
-                        color = const Color(0xFF30D158);
+                        color = const Color(0xFF10B981);
                       } else if (item.type == 'message') {
                         icon = CupertinoIcons.chat_bubble_2_fill;
-                        color = const Color(0xFFBF5AF2);
+                        color = textSecondary;
                       }
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1095,10 +1128,10 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                           Container(
                             padding: const EdgeInsets.all(9),
                             decoration: BoxDecoration(
-                              color: color.withValues(alpha: 0.22),
+                              color: AppGlass.subtleSurface(ctx),
                               borderRadius: BorderRadius.circular(11),
                               border: Border.all(
-                                color: color.withValues(alpha: 0.45),
+                                color: AppGlass.dividerColor(ctx),
                                 width: 0.6,
                               ),
                             ),
@@ -1111,10 +1144,10 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                               children: [
                                 Text(
                                   item.title,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w700,
                                     fontSize: 13.5,
-                                    color: Colors.white,
+                                    color: textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 3),
@@ -1122,7 +1155,7 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                                   item.body,
                                   style: TextStyle(
                                     fontSize: 12.5,
-                                    color: Colors.white.withValues(alpha: 0.78),
+                                    color: textSecondary,
                                   ),
                                 ),
                                 const SizedBox(height: 4),
@@ -1130,7 +1163,7 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                                   formatShortDate(item.createdAt),
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: Colors.white.withValues(alpha: 0.55),
+                                    color: textMuted,
                                   ),
                                 ),
                               ],

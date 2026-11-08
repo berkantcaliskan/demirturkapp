@@ -129,7 +129,7 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
     Color? color,
     required VoidCallback onTap,
   }) {
-    final activeColor = color ?? const Color(0xFF0A84FF);
+    final activeColor = color ?? const Color(0xFF0F172A);
     return CupertinoButton(
       padding: EdgeInsets.zero,
       minimumSize: Size.zero,
@@ -140,14 +140,18 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
         decoration: BoxDecoration(
           color: isSelected
-              ? activeColor.withValues(alpha: 0.85)
-              : Colors.white.withValues(alpha: isDark ? 0.10 : 0.18),
+              ? activeColor
+              : (isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : const Color(0xFF0F172A).withValues(alpha: 0.06)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isSelected
-                ? Colors.white.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: isDark ? 0.16 : 0.30),
-            width: 0.7,
+                ? activeColor
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.16)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.10)),
+            width: 0.8,
           ),
         ),
         child: Text(
@@ -155,10 +159,12 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
           style: TextStyle(
             fontSize: 12.5,
             letterSpacing: -0.2,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
             color: isSelected
                 ? Colors.white
-                : Colors.white.withValues(alpha: 0.82),
+                : (isDark
+                    ? Colors.white.withValues(alpha: 0.82)
+                    : const Color(0xFF334155)),
           ),
         ),
       ),
@@ -187,16 +193,16 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
                   color: AppGlass.subtleSurface(context),
                   borderRadius: BorderRadius.circular(9),
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.22),
+                    color: AppGlass.dividerColor(context),
                     width: 0.6,
                   ),
                 ),
                 child: Text(
                   '${note.installmentIndex} / ${note.totalInstallments}. SENET',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Colors.white,
+                    color: AppGlass.textPrimary(context),
                   ),
                 ),
               ),
@@ -204,11 +210,11 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
               Expanded(
                 child: Text(
                   note.senetNo,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.3,
-                    color: Colors.white,
+                    color: AppGlass.textPrimary(context),
                   ),
                 ),
               ),
@@ -275,11 +281,11 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
                   const SizedBox(height: 2),
                   Text(
                     formatDate(note.dueDate),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.2,
-                      color: Colors.white,
+                      color: AppGlass.textPrimary(context),
                     ),
                   ),
                 ],
@@ -297,11 +303,11 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
                   const SizedBox(height: 2),
                   Text(
                     formatCurrency(note.amount),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17.5,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -0.4,
-                      color: Colors.white,
+                      color: AppGlass.textPrimary(context),
                     ),
                   ),
                 ],
@@ -314,7 +320,7 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF453A).withValues(alpha: 0.20),
+                color: const Color(0xFFFF453A).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: const Color(0xFFFF453A).withValues(alpha: 0.45),
@@ -326,15 +332,15 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
                   const Icon(
                     CupertinoIcons.exclamationmark_circle_fill,
                     size: 16,
-                    color: Color(0xFFFF6961),
+                    color: Color(0xFFE11D48),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Red Açıklaması: ${note.rejectionReason}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white,
+                        color: AppGlass.textPrimary(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -350,10 +356,10 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF9F0A).withValues(alpha: 0.20),
+                color: const Color(0xFFFF9F0A).withValues(alpha: 0.16),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: const Color(0xFFFFD60A).withValues(alpha: 0.45),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
                   width: 0.7,
                 ),
               ),
@@ -362,15 +368,15 @@ class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
                   const Icon(
                     CupertinoIcons.doc_text_fill,
                     size: 16,
-                    color: Color(0xFFFFD60A),
+                    color: Color(0xFFD97706),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Yüklenen Dekont: ${note.receiptFileName} (${note.paymentMethod ?? ""})',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white,
+                        color: AppGlass.textPrimary(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
