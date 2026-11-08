@@ -33,13 +33,22 @@
 </head>
 <body>
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for (let registration of registrations) {
-          registration.unregister();
+    (async function() {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) {
+            await reg.unregister();
+          }
         }
-      });
-    }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const key of keys) {
+            await caches.delete(key);
+          }
+        }
+      } catch (e) {}
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
