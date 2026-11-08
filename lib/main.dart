@@ -350,7 +350,12 @@ class _MainShellState extends State<MainShell> {
               ],
             ),
           ),
-          body: isCustomer ? _buildCustomerBody() : _buildAdminBody(),
+          body: isCustomer
+              ? _buildCustomerBody(
+                  bottomNavHeight:
+                      58 + (bottomNavSafeSpacing * 0.42).clamp(8.0, 16.0),
+                )
+              : _buildAdminBody(),
           bottomNavigationBar: _buildBottomTabBar(
             context: context,
             isCustomer: isCustomer,
@@ -426,203 +431,139 @@ class _MainShellState extends State<MainShell> {
             ),
           ];
 
-    final bottomPad = (bottomNavSafeSpacing * 0.55).clamp(10.0, 22.0);
-    final bgBase = isDark ? const Color(0xFF141312) : const Color(0xFFEEF2F6);
+    final bottomPad = (bottomNavSafeSpacing * 0.42).clamp(8.0, 16.0);
 
-    return SizedBox(
-      height: 70 + bottomPad,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Keskin çerçeve/katman olmadan, arka plana dahil gibi görünen ve
-          // altında kalan sayfa içeriğini kademeli olarak güçlü biçimde blurlayan katmanlar.
-          // Not: ShaderMask içinde BackdropFilter kullanıldığında CanvasKit'te
-          // saveLayer nedeniyle arka plan blurlanmadığından doğrudan kademeli ClipRect + BackdropFilter kullanılır.
-          Positioned.fill(
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: const SizedBox.expand(),
-              ),
-            ),
+    // Gerçek Frosted Glass: Container ve içerik doğrudan BackdropFilter'ın child'ı
+    // olarak çizilir; böylece Flutter motoru tüm navbar alanını gerçek Gaussian blur ile blurlar.
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 28.0, sigmaY: 28.0),
+        child: Container(
+          height: 58 + bottomPad,
+          padding: EdgeInsets.fromLTRB(16, 6, 16, bottomPad),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF141312).withValues(alpha: 0.62)
+                : const Color(0xFFF8F9FB).withValues(alpha: 0.64),
           ),
-          Positioned(
-            top: 5,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 11,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-          Positioned(
-            top: 16,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 38, sigmaY: 38),
-                child: const SizedBox.expand(),
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      bgBase.withValues(alpha: 0.0),
-                      bgBase.withValues(alpha: isDark ? 0.30 : 0.26),
-                      bgBase.withValues(alpha: isDark ? 0.56 : 0.48),
-                    ],
-                    stops: const [0.0, 0.26, 1.0],
+          child: Stack(
+            children: [
+              // Seçili sekmeye doğru sağa/sola kayan aktif gösterge
+              Positioned.fill(
+                child: AnimatedAlign(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment(
+                    items.length > 1
+                        ? -1.0 + (2.0 * activeIndex / (items.length - 1))
+                        : 0.0,
+                    0.0,
                   ),
-                ),
-              ),
-            ),
-          ),
-
-          // Sekmeler ve sağa-sola kayan aktif sekme göstergesi (etrafında kutu/katman yok)
-          Padding(
-            padding: EdgeInsets.fromLTRB(20, 14, 20, bottomPad),
-            child: Stack(
-              children: [
-                // Seçili sekmeye doğru sağa/sola kayan aktif gösterge
-                Positioned.fill(
-                  child: AnimatedAlign(
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment(
-                      items.length > 1
-                          ? -1.0 + (2.0 * activeIndex / (items.length - 1))
-                          : 0.0,
-                      0.0,
-                    ),
-                    child: FractionallySizedBox(
-                      widthFactor: 1.0 / items.length,
-                      heightFactor: 1.0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFFF5F3F0)
-                              : const Color(0xFF1E293B),
-                          borderRadius: BorderRadius.circular(18),
-                        ),
+                  child: FractionallySizedBox(
+                    widthFactor: 1.0 / items.length,
+                    heightFactor: 1.0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFFF5F3F0)
+                            : const Color(0xFF1E293B),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                     ),
                   ),
                 ),
-                Row(
-                  children: List.generate(items.length, (idx) {
-                    final item = items[idx];
-                    final isSelected = idx == activeIndex;
-                    final activeFg =
-                        isDark ? const Color(0xFF121110) : Colors.white;
-                    final inactiveFg = isDark
-                        ? const Color(0xFF9C958C)
-                        : const Color(0xFF64748B);
+              ),
+              Row(
+                children: List.generate(items.length, (idx) {
+                  final item = items[idx];
+                  final isSelected = idx == activeIndex;
+                  final activeFg =
+                      isDark ? const Color(0xFF121110) : Colors.white;
+                  final inactiveFg = isDark
+                      ? const Color(0xFF9C958C)
+                      : const Color(0xFF64748B);
 
-                    return Expanded(
-                      child: GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          if (isCustomer) {
-                            _switchCustomerTab(idx);
-                          } else {
-                            _switchAdminTab(idx);
-                          }
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  item.assetIcon != null
-                                      ? Image.asset(
-                                          item.assetIcon!,
-                                          width: 20,
-                                          height: 20,
-                                          fit: BoxFit.contain,
-                                          color:
-                                              isSelected ? activeFg : inactiveFg,
-                                          colorBlendMode: BlendMode.srcIn,
-                                        )
-                                      : Icon(
-                                          isSelected
-                                              ? item.activeIcon
-                                              : item.icon,
-                                          size: 20,
-                                          color:
-                                              isSelected ? activeFg : inactiveFg,
-                                        ),
-                                  if (item.badgeCount > 0)
-                                    Positioned(
-                                      right: -6,
-                                      top: -3,
-                                      child: Container(
-                                        width: 8,
-                                        height: 8,
-                                        decoration: const BoxDecoration(
-                                          color: Color(0xFFE11D48),
-                                          shape: BoxShape.circle,
-                                        ),
+                  return Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (isCustomer) {
+                          _switchCustomerTab(idx);
+                        } else {
+                          _switchAdminTab(idx);
+                        }
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                item.assetIcon != null
+                                    ? Image.asset(
+                                        item.assetIcon!,
+                                        width: 20,
+                                        height: 20,
+                                        fit: BoxFit.contain,
+                                        color:
+                                            isSelected ? activeFg : inactiveFg,
+                                        colorBlendMode: BlendMode.srcIn,
+                                      )
+                                    : Icon(
+                                        isSelected
+                                            ? item.activeIcon
+                                            : item.icon,
+                                        size: 20,
+                                        color:
+                                            isSelected ? activeFg : inactiveFg,
+                                      ),
+                                if (item.badgeCount > 0)
+                                  Positioned(
+                                    right: -6,
+                                    top: -3,
+                                    child: Container(
+                                      width: 8,
+                                      height: 8,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFE11D48),
+                                        shape: BoxShape.circle,
                                       ),
                                     ),
-                                ],
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              item.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 10,
+                                letterSpacing: -0.2,
+                                fontWeight: isSelected
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: isSelected ? activeFg : inactiveFg,
                               ),
-                              const SizedBox(height: 3),
-                              Text(
-                                item.label,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  letterSpacing: -0.2,
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: isSelected ? activeFg : inactiveFg,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  }),
-                ),
-              ],
-            ),
+                    ),
+                  );
+                }),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCustomerBody() {
+  Widget _buildCustomerBody({required double bottomNavHeight}) {
     final Widget page;
     switch (_customerTabIndex) {
       case 0:
@@ -643,8 +584,10 @@ class _MainShellState extends State<MainShell> {
         );
         break;
       case 3:
-        // Resmi
-        page = const CustomerWebsiteScreen();
+        // Resmi (iframe navbar'ın üstünü kapatmasın diye bottomPadding verilir)
+        page = CustomerWebsiteScreen(
+          bottomPadding: bottomNavHeight,
+        );
         break;
       case 4:
         // Hesabım -> Sözleşmelerim & Ayarlar Menüsü
@@ -672,6 +615,12 @@ class _MainShellState extends State<MainShell> {
         );
       },
       transitionBuilder: (child, animation) {
+        if (child.key == const ValueKey<int>(3)) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        }
         final isIncoming = child.key == ValueKey<int>(_customerTabIndex);
         // Yeni sayfa aşağıdan yukarıya (bottom-to-top) kayarak gelir
         final beginOffset = isIncoming
