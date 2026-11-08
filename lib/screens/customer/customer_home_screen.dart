@@ -112,7 +112,7 @@ class CustomerHomeScreen extends StatelessWidget {
             appState,
             preselectedNote: urgentNote,
           ),
-          onDetailsTap: () => showAccountStatementDialog(context, appState),
+          onDetailsTap: () => onNavigateTab(1),
         ),
         const SizedBox(height: 14),
 
@@ -124,21 +124,27 @@ class CustomerHomeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 14),
 
-        // 4. Sıradaki Senet & Konut Kartı
-        if (urgentNote != null) ...[
-          _NextInstallmentSpotlightCard(
-            customer: customer,
-            note: urgentNote,
-            progress: progress,
-            onUploadTap: () => showUploadReceiptSheet(
-              context,
-              appState,
-              preselectedNote: urgentNote,
-            ),
-            onIbanTap: () => showIbanSheet(context, appState),
-          ),
-          const SizedBox(height: 14),
-        ],
+        // 4. Üçüncü Kart: Gecikmiş / Ödenmemiş Senet Kartı (Ödenmemiş senet yoksa yeşil Harika görünümü)
+        _NextInstallmentSpotlightCard(
+          customer: customer,
+          overdueNote: overdueNotes.isNotEmpty ? overdueNotes.first : null,
+          paidCount: paidCount,
+          totalNotes: notes.length,
+          progress: progress,
+          onUploadTap: () {
+            if (overdueNotes.isNotEmpty) {
+              showUploadReceiptSheet(
+                context,
+                appState,
+                preselectedNote: overdueNotes.first,
+              );
+            } else {
+              onNavigateTab(1);
+            }
+          },
+          onIbanTap: () => showIbanSheet(context, appState),
+        ),
+        const SizedBox(height: 14),
 
         // 5. Birleşik Senet & Taksit Tablo Kartı
         GlassCard(
@@ -1346,17 +1352,21 @@ class _DualWaveChartPainter extends CustomPainter {
   }
 }
 
-/// Sıradaki Senet & Konut Kartı (Az renkli, 3B kenarlıksız)
+/// Üçüncü Kart: Gecikmiş Senet / Ödenmemiş Senet Yoksa Yeşil "Harika" Kartı
 class _NextInstallmentSpotlightCard extends StatelessWidget {
   final Customer customer;
-  final PromissoryNote note;
+  final PromissoryNote? overdueNote;
+  final int paidCount;
+  final int totalNotes;
   final double progress;
   final VoidCallback onUploadTap;
   final VoidCallback onIbanTap;
 
   const _NextInstallmentSpotlightCard({
     required this.customer,
-    required this.note,
+    required this.overdueNote,
+    required this.paidCount,
+    required this.totalNotes,
     required this.progress,
     required this.onUploadTap,
     required this.onIbanTap,
@@ -1364,93 +1374,142 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isOverdue = note.status == NoteStatus.overdue;
+    final isDark = AppGlass.isDark(context);
+    final note = overdueNote;
+    final hasOverdue = note != null;
+    final greenAccent =
+        isDark ? const Color(0xFF22C55E) : const Color(0xFF16A34A);
 
     return GlassCard(
       borderRadius: 24,
-      tone: isOverdue ? GlassCardTone.urgentRed : GlassCardTone.standard,
+      tone: hasOverdue ? GlassCardTone.urgentRed : GlassCardTone.successGreen,
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           Expanded(
             flex: 6,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  isOverdue ? 'Gecikmiş Senet' : 'Sıradaki Senet Vadesi',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: AppGlass.textPrimary(context),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 50,
-                      height: 16,
-                      child: CustomPaint(
-                        painter: _MiniSparklinePainter(
+            child: hasOverdue
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Gecikmiş Senet',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppGlass.textPrimary(context),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 50,
+                            height: 16,
+                            child: CustomPaint(
+                              painter: _MiniSparklinePainter(
+                                color: AppGlass.textSecondary(context),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${note.installmentIndex}/${note.totalInstallments} Taksit',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        formatCurrency(note.amount),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.5,
+                          color: Color(0xFFE11D48),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            decoration: BoxDecoration(
+                              color: AppGlass.subtleSurface(context),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Icon(
+                              CupertinoIcons.calendar,
+                              size: 13,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Vade: ${formatDate(note.dueDate)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: AppGlass.textMuted(context),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          SizedBox(
+                            width: 50,
+                            height: 16,
+                            child: CustomPaint(
+                              painter: _MiniSparklinePainter(
+                                color: greenAccent,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$paidCount/$totalNotes Taksit',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Harika',
+                        style: TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
+                          color: greenAccent,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ödenmemiş senediniz yok',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
                           color: AppGlass.textSecondary(context),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${note.installmentIndex}/${note.totalInstallments} Taksit',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppGlass.textSecondary(context),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  formatCurrency(note.amount),
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.5,
-                    color: isOverdue
-                        ? const Color(0xFFE11D48)
-                        : AppGlass.textPrimary(context),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: AppGlass.subtleSurface(context),
-                        borderRadius: BorderRadius.circular(7),
-                      ),
-                      child: Icon(
-                        CupertinoIcons.calendar,
-                        size: 13,
-                        color: AppGlass.textSecondary(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Vade: ${formatDate(note.dueDate)}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: AppGlass.textMuted(context),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
           ),
           const SizedBox(width: 12),
 
@@ -1490,11 +1549,13 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Dekont Yükle →',
+                      hasOverdue ? 'Dekont Yükle →' : 'Ödemelerim →',
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w600,
-                        color: AppGlass.textSecondary(context),
+                        color: hasOverdue
+                            ? AppGlass.textSecondary(context)
+                            : greenAccent,
                       ),
                     ),
                   ],

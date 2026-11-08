@@ -243,6 +243,7 @@ enum GlassCardTone {
   standard,
   hero,
   urgentRed,
+  successGreen,
   infoBlue,
   warningAmber,
 }
@@ -302,6 +303,7 @@ class GlassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = AppGlass.isDark(context);
     final isUrgentRed = tone == GlassCardTone.urgentRed;
+    final isSuccessGreen = tone == GlassCardTone.successGreen;
 
     // Koyu modda zeminden (#121110) belirgin biçimde ayrılan daha açık sıcak koyu kart yüzeyi (#211F1D)
     final Color bgColor = isDark
@@ -325,7 +327,24 @@ class GlassCard extends StatelessWidget {
                   ],
             stops: const [0.0, 0.48, 1.0],
           )
-        : null;
+        : isSuccessGreen
+            ? LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: isDark
+                    ? [
+                        const Color(0xFF1D2520).withValues(alpha: 0.94),
+                        const Color(0xFF1B3627).withValues(alpha: 0.90),
+                        const Color(0xFF17492E).withValues(alpha: 0.86),
+                      ]
+                    : [
+                        const Color(0xFFF2FDF6).withValues(alpha: 0.94),
+                        const Color(0xFFDCFCE7).withValues(alpha: 0.88),
+                        const Color(0xFFBBF7D0).withValues(alpha: 0.84),
+                      ],
+                stops: const [0.0, 0.48, 1.0],
+              )
+            : null;
 
     // 3B kabartma hissi vermeyen çok ince, neredeyse belirsiz mat sınır
     final Color borderColor = customBorderColor ??
@@ -333,9 +352,13 @@ class GlassCard extends StatelessWidget {
             ? (isDark
                 ? const Color(0xFFE11D48).withValues(alpha: 0.26)
                 : const Color(0xFFE11D48).withValues(alpha: 0.16))
-            : (isDark
-                ? const Color(0xFFFFF8F0).withValues(alpha: 0.08)
-                : const Color(0xFF0F172A).withValues(alpha: 0.05)));
+            : isSuccessGreen
+                ? (isDark
+                    ? const Color(0xFF22C55E).withValues(alpha: 0.26)
+                    : const Color(0xFF16A34A).withValues(alpha: 0.16))
+                : (isDark
+                    ? const Color(0xFFFFF8F0).withValues(alpha: 0.08)
+                    : const Color(0xFF0F172A).withValues(alpha: 0.05)));
 
     return Padding(
       padding: margin ?? EdgeInsets.zero,
