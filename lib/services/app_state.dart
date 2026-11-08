@@ -43,7 +43,13 @@ class AppState extends ChangeNotifier {
     ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
   List<SupportTicket> get customerTickets => _tickets
-      .where((t) => t.customerId == _selectedCustomerId)
+      .where(
+        (t) =>
+            t.customerId == _selectedCustomerId &&
+            !(t.isEndedByCustomer &&
+                t.channel != 'advisor' &&
+                t.channel != 'finance'),
+      )
       .toList()
     ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
@@ -315,76 +321,7 @@ class AppState extends ChangeNotifier {
     ),
   ];
 
-  final List<SupportTicket> _tickets = [
-    SupportTicket(
-      id: 'tck_1',
-      customerId: 'cust_1',
-      subject: 'SNT-2026-003 Gecikmiş Senet Ödeme Tarihi Hakkında',
-      category: 'Finans & Muhasebe',
-      channel: 'finance',
-      relatedSenetNo: 'SNT-2026-003',
-      isResolved: false,
-      updatedAt: DateTime(2026, 11, 4, 13, 15),
-      messages: [
-        ChatMessage(
-          id: 'msg_1',
-          isFromAdmin: false,
-          senderName: 'Ahmet Yılmaz',
-          text:
-              'Merhabalar, 15 Ekim vadeli SNT-2026-003 numaralı senedimin ödemesini bu Cuma günü IBAN hesabınıza göndereceğim. Bilginize sunarım.',
-          timestamp: DateTime(2026, 11, 4, 12, 40),
-        ),
-        ChatMessage(
-          id: 'msg_2',
-          isFromAdmin: true,
-          senderName: 'Finans & Muhasebe Uzmanı',
-          text:
-              'Merhaba Ahmet Bey, bilgilendirmeniz için teşekkür ederiz. Ödemeyi gerçekleştirdikten sonra uygulama üzerinden dekontu yükleyebilirsiniz, işleminiz hemen onaylanacaktır.',
-          timestamp: DateTime(2026, 11, 4, 13, 15),
-        ),
-      ],
-    ),
-    SupportTicket(
-      id: 'tck_adv_1',
-      customerId: 'cust_1',
-      subject: 'Selim Demirtürk • Satış Danışmanı Görüşmesi',
-      category: 'Satış Danışmanım',
-      channel: 'advisor',
-      isResolved: false,
-      updatedAt: DateTime(2026, 11, 5, 11, 30),
-      messages: [
-        ChatMessage(
-          id: 'msg_adv_1',
-          isFromAdmin: true,
-          senderName: 'Selim Demirtürk',
-          text:
-              'Merhaba Ahmet Bey, Yenişehir 3. Etap A Blok Daire 12 konutunuzla ilgili her türlü sorunuzda doğrudan buradan bana ulaşabilirsiniz.',
-          timestamp: DateTime(2026, 11, 5, 11, 30),
-        ),
-      ],
-    ),
-    SupportTicket(
-      id: 'tck_2',
-      customerId: 'cust_2',
-      subject: 'Ekim Ayı Filo Senedi Dekont Bildirimi',
-      category: 'Finans & Muhasebe',
-      channel: 'finance',
-      relatedSenetNo: 'SNT-2026-102',
-      isResolved: false,
-      updatedAt: DateTime(2026, 11, 4, 10, 05),
-      messages: [
-        ChatMessage(
-          id: 'msg_3',
-          isFromAdmin: false,
-          senderName: 'Kaya İnşaat & Mimarlık Ltd. Şti.',
-          text:
-              'SNT-2026-102 nolu 85.000 TL tutarındaki senedimizin ödemesini Garanti BBVA hesabınıza EFT yaptık, dekontu sisteme yükledik. Onayınızı rica ederiz.',
-          timestamp: DateTime(2026, 11, 4, 10, 05),
-          attachmentName: 'kaya_insaat_ekim_dekont.pdf',
-        ),
-      ],
-    ),
-  ];
+  final List<SupportTicket> _tickets = [];
 
   final List<AppNotification> _notifications = [
     AppNotification(
@@ -680,7 +617,10 @@ class AppState extends ChangeNotifier {
   SupportTicket getOrCreateChannelTicket(String channel) {
     final customer = currentCustomer;
     final existingIndex = _tickets.indexWhere(
-      (t) => t.customerId == customer.id && t.channel == channel,
+      (t) =>
+          t.customerId == customer.id &&
+          t.channel == channel &&
+          !t.isEndedByCustomer,
     );
     if (existingIndex != -1) {
       return _tickets[existingIndex];
@@ -689,27 +629,16 @@ class AppState extends ChangeNotifier {
     final advisor = currentSalesAdvisor;
     final String subject;
     final String category;
-    final String welcomeSender;
-    final String welcomeText;
 
     if (channel == 'advisor') {
-      subject = '${advisor.name} • Satış Danışmanı Görüşmesi';
+      subject = advisor.firstName;
       category = 'Satış Danışmanım';
-      welcomeSender = advisor.name;
-      welcomeText =
-          'Merhaba ${customer.name}, ${customer.projectTitle} (${customer.unitSubtitle}) konutunuzla ilgili her konuda bana doğrudan buradan yazabilirsiniz.';
     } else if (channel == 'finance') {
-      subject = 'Finans Uzmanı & Muhasebe Görüşmesi';
+      subject = 'Finans Uzmanımız';
       category = 'Finans & Muhasebe';
-      welcomeSender = 'Finans & Muhasebe Uzmanı';
-      welcomeText =
-          'Merhaba ${customer.name}, senet vadeleriniz, ödeme dekontlarınız ve hesap mutabakatınız için muhasebe birimimizle doğrudan buradan görüşebilirsiniz.';
     } else {
-      subject = 'Genel Şirket Paneli • Yetkili Destek Hattı';
-      category = 'Genel Şirket Paneli';
-      welcomeSender = 'Demirtürk Yetkili Masası';
-      welcomeText =
-          'Merhaba ${customer.name}, mesajınız doğrudan genel şirket paneline iletilir. Müsait olan ilk yetkilimiz size anında yanıt verecektir.';
+      subject = 'Yetkili Görüşmesi';
+      category = 'Genel Mesajlaşma';
     }
 
     final created = SupportTicket(
@@ -719,21 +648,32 @@ class AppState extends ChangeNotifier {
       category: category,
       channel: channel,
       isResolved: false,
+      isEndedByCustomer: false,
       updatedAt: DateTime.now(),
-      messages: [
-        ChatMessage(
-          id: 'msg_welcome_${DateTime.now().millisecondsSinceEpoch}',
-          isFromAdmin: true,
-          senderName: welcomeSender,
-          text: welcomeText,
-          timestamp: DateTime.now(),
-        ),
-      ],
+      messages: const [],
     );
 
     _tickets.insert(0, created);
     notifyListeners();
     return created;
+  }
+
+  // Satış danışmanı ve muhasebe dışındaki sohbetlerde "Sohbeti Bitir" dendiğinde müşteride kaybolur, şirkette depolanır
+  void endCustomerChat(String ticketId) {
+    final index = _tickets.indexWhere((t) => t.id == ticketId);
+    if (index == -1) return;
+    final ticket = _tickets[index];
+    if (ticket.channel == 'advisor' || ticket.channel == 'finance') return;
+
+    if (ticket.messages.isEmpty) {
+      _tickets.removeAt(index);
+    } else {
+      _tickets[index] = ticket.copyWith(
+        isEndedByCustomer: true,
+        isResolved: true,
+      );
+    }
+    notifyListeners();
   }
 
   // Customer or Admin action: Reply to a support ticket
@@ -755,17 +695,17 @@ class AppState extends ChangeNotifier {
 
     final String adminSenderName;
     if (ticket.channel == 'advisor') {
-      adminSenderName = advisor.name;
+      adminSenderName = advisor.firstName;
     } else if (ticket.channel == 'finance') {
-      adminSenderName = 'Finans & Muhasebe Uzmanı';
+      adminSenderName = 'Finans Uzmanı';
     } else {
-      adminSenderName = 'Şirket Yetkilisi (Genel Panel)';
+      adminSenderName = 'Yetkili';
     }
 
     final newMessage = ChatMessage(
       id: 'msg_${DateTime.now().millisecondsSinceEpoch}',
       isFromAdmin: isFromAdmin,
-      senderName: isFromAdmin ? adminSenderName : customer.name,
+      senderName: isFromAdmin ? adminSenderName : customer.firstName,
       text: text,
       timestamp: DateTime.now(),
       attachmentName: attachmentName,

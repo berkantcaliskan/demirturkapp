@@ -573,47 +573,84 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
     final subTextColor =
         isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF64748B);
 
+    // Sol kenarda blurlu ve yumuşak geçiş sağlayan alt görsel katmanı
+    Widget buildSoftBlurredTransitionImage() {
+      return ShaderMask(
+        shaderCallback: (rect) {
+          return const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Color(0x00FFFFFF),
+              Color(0x00FFFFFF),
+              Color(0x59FFFFFF),
+              Color(0xD9FFFFFF),
+              Color(0xFFFFFFFF),
+              Color(0xFFFFFFFF),
+            ],
+            stops: [
+              0.00,
+              0.34,
+              0.41,
+              0.48,
+              0.55,
+              1.00,
+            ],
+          ).createShader(rect);
+        },
+        blendMode: BlendMode.dstIn,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: FractionallySizedBox(
+            widthFactor: 0.68,
+            heightFactor: 1.0,
+            child: ClipRect(
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+                child: Image.asset(
+                  customer.projectImageAsset,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Sağda net bina ve çatı çıkıntısını koruyan ana görsel katmanı
     Widget buildProjectImage() {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: FractionallySizedBox(
-          widthFactor: 0.68,
-          heightFactor: 1.0,
-          child: ClipRect(
-            child: ShaderMask(
-              shaderCallback: (rect) {
-                return const LinearGradient(
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                  colors: [
-                    Color(0x00FFFFFF),
-                    Color(0x00FFFFFF),
-                    Color(0x06FFFFFF),
-                    Color(0x1CFFFFFF),
-                    Color(0x47FFFFFF),
-                    Color(0x80FFFFFF),
-                    Color(0xB8FFFFFF),
-                    Color(0xE3FFFFFF),
-                    Color(0xFAFFFFFF),
-                    Color(0xFFFFFFFF),
-                    Color(0xFFFFFFFF),
-                  ],
-                  stops: [
-                    0.00,
-                    0.04,
-                    0.08,
-                    0.12,
-                    0.17,
-                    0.21,
-                    0.25,
-                    0.29,
-                    0.33,
-                    0.36,
-                    1.00,
-                  ],
-                ).createShader(rect);
-              },
-              blendMode: BlendMode.dstIn,
+      return ShaderMask(
+        shaderCallback: (rect) {
+          return const LinearGradient(
+            begin: Alignment.centerLeft,
+            end: Alignment.centerRight,
+            colors: [
+              Color(0x00FFFFFF),
+              Color(0x00FFFFFF),
+              Color(0x38FFFFFF),
+              Color(0xA6FFFFFF),
+              Color(0xFFFFFFFF),
+              Color(0xFFFFFFFF),
+            ],
+            stops: [
+              0.00,
+              0.39,
+              0.45,
+              0.51,
+              0.56,
+              1.00,
+            ],
+          ).createShader(rect);
+        },
+        blendMode: BlendMode.dstIn,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: FractionallySizedBox(
+            widthFactor: 0.68,
+            heightFactor: 1.0,
+            child: ClipRect(
               child: Image.asset(
                 customer.projectImageAsset,
                 fit: BoxFit.cover,
@@ -640,7 +677,16 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
               ),
               child: Stack(
                 children: [
-                  // 1. Sağ tarafta müşterinin satın aldığı ev görseli (S-eğrisiyle kesintisiz erir)
+                  // 1a. Sol geçişte yumuşak blurlu erime katmanı
+                  Positioned(
+                    top: -topOverhang,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: buildSoftBlurredTransitionImage(),
+                  ),
+
+                  // 1b. Sağ tarafta net ev görseli (blurlu katman üzerine yumuşakça oturur)
                   Positioned(
                     top: -topOverhang,
                     left: 0,

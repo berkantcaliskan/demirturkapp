@@ -80,6 +80,8 @@ class SalesAdvisor {
     required this.photoUpdatedAt,
   });
 
+  String get firstName => name.trim().split(RegExp(r'\s+')).first;
+
   SalesAdvisor copyWith({
     String? name,
     String? roleTitle,
@@ -270,6 +272,7 @@ class SupportTicket {
   final String channel; // 'advisor' | 'finance' | 'general'
   final String? relatedSenetNo;
   final bool isResolved;
+  final bool isEndedByCustomer;
   final DateTime updatedAt;
   final List<ChatMessage> messages;
 
@@ -281,12 +284,14 @@ class SupportTicket {
     this.channel = 'general',
     this.relatedSenetNo,
     required this.isResolved,
+    this.isEndedByCustomer = false,
     required this.updatedAt,
     required this.messages,
   });
 
   SupportTicket copyWith({
     bool? isResolved,
+    bool? isEndedByCustomer,
     DateTime? updatedAt,
     List<ChatMessage>? messages,
   }) {
@@ -298,6 +303,7 @@ class SupportTicket {
       channel: channel,
       relatedSenetNo: relatedSenetNo,
       isResolved: isResolved ?? this.isResolved,
+      isEndedByCustomer: isEndedByCustomer ?? this.isEndedByCustomer,
       updatedAt: updatedAt ?? this.updatedAt,
       messages: messages ?? this.messages,
     );
