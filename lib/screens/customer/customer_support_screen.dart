@@ -302,7 +302,7 @@ class _FinanceSpecialistCard extends StatelessWidget {
                 const SizedBox(width: 11),
                 Expanded(
                   child: Text(
-                    'Finans Uzmanımız ile görüşün',
+                    'Finans uzmanımız ile görüşün',
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w700,

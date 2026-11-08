@@ -75,13 +75,13 @@ class CustomerNotesScreen extends StatelessWidget {
                   ),
                   Expanded(
                     child: _SmallSummaryDetail(
-                      label: 'Kalan Senet',
+                      label: 'Kalan senet',
                       value: '$remainingCount / ${notes.length}',
                     ),
                   ),
                   Expanded(
                     child: _SmallSummaryDetail(
-                      label: 'Sıradaki Vade',
+                      label: 'Sıradaki vade',
                       value: nextDueNote != null
                           ? formatShortDate(nextDueNote.dueDate)
                           : '-',
@@ -116,7 +116,7 @@ class CustomerNotesScreen extends StatelessWidget {
               const SizedBox(width: 11),
               Expanded(
                 child: Text(
-                  'Ödeme Bilgileri',
+                  'Ödeme bilgileri',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -172,7 +172,7 @@ class CustomerNotesScreen extends StatelessWidget {
                     Expanded(
                       flex: 5,
                       child: Text(
-                        'Konut & Senet',
+                        'Konut & senet',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -183,7 +183,7 @@ class CustomerNotesScreen extends StatelessWidget {
                     Expanded(
                       flex: 3,
                       child: Text(
-                        'Vade Tarihi',
+                        'Vade tarihi',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,

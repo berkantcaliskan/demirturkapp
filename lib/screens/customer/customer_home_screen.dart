@@ -158,7 +158,7 @@ class CustomerHomeScreen extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      'Bu Dönemdeki Senet & Taksitleriniz',
+                      'Bu dönemdeki senet & taksitleriniz',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -214,7 +214,7 @@ class CustomerHomeScreen extends StatelessWidget {
                     Expanded(
                       flex: 5,
                       child: Text(
-                        'Konut & Senet',
+                        'Konut & senet',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -225,7 +225,7 @@ class CustomerHomeScreen extends StatelessWidget {
                     Expanded(
                       flex: 3,
                       child: Text(
-                        'Vade Tarihi',
+                        'Vade tarihi',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
@@ -395,7 +395,7 @@ class CustomerHomeScreen extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        'Tümünü Gör',
+                        'Tümünü gör',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -765,7 +765,7 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              'Ödeme Bildir',
+                              'Ödeme bildir',
                               style: TextStyle(
                                 color: isDark
                                     ? const Color(0xFF0F172A)
@@ -1393,7 +1393,7 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Gecikmiş Senet',
+                        'Gecikmiş senet',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -1549,7 +1549,7 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      hasOverdue ? 'Dekont Yükle →' : 'Ödemelerim →',
+                      hasOverdue ? 'Dekont yükle →' : 'Ödemelerim →',
                       style: TextStyle(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w600,

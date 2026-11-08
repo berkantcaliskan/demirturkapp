@@ -715,7 +715,7 @@ class _MainShellState extends State<MainShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Görünüm Modu',
+                      'Görünüm',
                       style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -725,7 +725,7 @@ class _MainShellState extends State<MainShell> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      isDark ? 'Koyu Görünüm Aktif' : 'Aydınlık Görünüm Aktif',
+                      isDark ? 'Koyu görünüm' : 'Aydınlık görünüm',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppGlass.textMuted(context),
