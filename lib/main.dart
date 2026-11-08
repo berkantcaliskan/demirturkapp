@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'models/app_models.dart';
 import 'services/app_state.dart';
 import 'screens/customer/customer_home_screen.dart';
+import 'screens/customer/customer_notes_screen.dart';
 import 'screens/customer/customer_support_screen.dart';
 import 'screens/customer/customer_website_screen.dart';
 import 'screens/customer/iban_and_statement_sheets.dart';
@@ -574,8 +575,10 @@ class _MainShellState extends State<MainShell> {
         );
         break;
       case 1:
-        // Ödemelerim (Şimdilik temizlendi)
-        page = const SizedBox.expand();
+        // Ödemelerim
+        page = CustomerNotesScreen(
+          appState: widget.appState,
+        );
         break;
       case 2:
         // İletişim

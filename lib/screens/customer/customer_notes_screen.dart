@@ -1,13 +1,11 @@
-import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../widgets/website_blurred_background.dart';
 import 'iban_and_statement_sheets.dart';
 
-class CustomerNotesScreen extends StatefulWidget {
+class CustomerNotesScreen extends StatelessWidget {
   final AppState appState;
 
   const CustomerNotesScreen({
@@ -16,436 +14,401 @@ class CustomerNotesScreen extends StatefulWidget {
   });
 
   @override
-  State<CustomerNotesScreen> createState() => _CustomerNotesScreenState();
-}
-
-class _CustomerNotesScreenState extends State<CustomerNotesScreen> {
-  NoteStatus? _selectedFilter;
-
-  @override
   Widget build(BuildContext context) {
-    final allNotes = widget.appState.customerNotes;
-    final filteredNotes = _selectedFilter == null
-        ? allNotes
-        : allNotes.where((n) => n.status == _selectedFilter).toList();
-    final isDark = AppGlass.isDark(context);
+    final customer = appState.currentCustomer;
+    final notes = appState.customerNotes;
+    final total = appState.getCustomerTotalAmount(customer.id);
+    final paid = appState.getCustomerPaidAmount(customer.id);
+    final remaining = appState.getCustomerRemainingAmount(customer.id);
 
-    return Column(
+    final paidCount = notes.where((n) => n.status == NoteStatus.paid).length;
+    final remainingCount = notes.length - paidCount;
+
+    final unpaidNotes =
+        notes.where((n) => n.status != NoteStatus.paid).toList();
+    final nextDueNote = unpaidNotes.isNotEmpty ? unpaidNotes.first : null;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
       children: [
-        // iOS Frosted Glass Filter Bar
-        ClipRect(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF090D14).withValues(alpha: 0.36)
-                    : Colors.white.withValues(alpha: 0.12),
-                border: Border(
-                  bottom: BorderSide(
-                    color: Colors.white.withValues(alpha: isDark ? 0.12 : 0.24),
-                    width: 0.6,
+        // 1. Üst Özet: Kalan Ödeme büyük, altında toplam miktar, kalan senet ve detaylar küçük
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'KALAN ÖDEME',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.2,
+                  height: 1.1,
+                  color: AppGlass.textMuted(context),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                formatCurrency(remaining),
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.9,
+                  height: 1.1,
+                  color: AppGlass.textPrimary(context),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SmallSummaryDetail(
+                      label: 'Toplam',
+                      value: formatCompactCurrency(total),
+                    ),
+                  ),
+                  Expanded(
+                    child: _SmallSummaryDetail(
+                      label: 'Ödenen',
+                      value: formatCompactCurrency(paid),
+                    ),
+                  ),
+                  Expanded(
+                    child: _SmallSummaryDetail(
+                      label: 'Kalan Senet',
+                      value: '$remainingCount / ${notes.length}',
+                    ),
+                  ),
+                  Expanded(
+                    child: _SmallSummaryDetail(
+                      label: 'Sıradaki Vade',
+                      value: nextDueNote != null
+                          ? formatShortDate(nextDueNote.dueDate)
+                          : '-',
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // 2. Ödeme Bilgileri (Kuruma) Kartı — Şimdilik tıklandığında açılmaz
+        GlassCard(
+          borderRadius: 20,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppGlass.subtleSurface(context),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  CupertinoIcons.building_2_fill,
+                  size: 16,
+                  color: AppGlass.textPrimary(context),
+                ),
+              ),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Text(
+                  'Ödeme Bilgileri',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -0.2,
+                    color: AppGlass.textPrimary(context),
                   ),
                 ),
               ),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
+              Icon(
+                CupertinoIcons.chevron_forward,
+                size: 14,
+                color: AppGlass.textSecondary(context),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // 3. Tek Kart Uzun Senetler
+        GlassCard(
+          borderRadius: 24,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Senetler',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.3,
+                      color: AppGlass.textPrimary(context),
+                    ),
+                  ),
+                  Text(
+                    '$paidCount / ${notes.length} Taksit',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w500,
+                      color: AppGlass.textMuted(context),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
                 child: Row(
                   children: [
-                    _buildFilterChip(
-                      label: 'Tümü (${allNotes.length})',
-                      isSelected: _selectedFilter == null,
-                      isDark: isDark,
-                      onTap: () => setState(() => _selectedFilter = null),
-                    ),
-                    const SizedBox(width: 8),
-                    ...NoteStatus.values.map((status) {
-                      final count =
-                          allNotes.where((n) => n.status == status).length;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: _buildFilterChip(
-                          label: '${status.label} ($count)',
-                          isSelected: _selectedFilter == status,
-                          color: status.color,
-                          isDark: isDark,
-                          onTap: () => setState(() => _selectedFilter = status),
+                    Expanded(
+                      flex: 5,
+                      child: Text(
+                        'Konut & Senet',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppGlass.textMuted(context),
                         ),
-                      );
-                    }),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Vade Tarihi',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppGlass.textMuted(context),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text(
+                        'Tutar',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: AppGlass.textMuted(context),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
-            ),
-          ),
-        ),
+              const SizedBox(height: 8),
+              Divider(
+                height: 1,
+                color: AppGlass.dividerColor(context),
+              ),
+              const SizedBox(height: 10),
+              ...notes.map((note) {
+                final Color statusDotColor;
+                switch (note.status) {
+                  case NoteStatus.paid:
+                    statusDotColor = const Color(0xFF30D158);
+                    break;
+                  case NoteStatus.overdue:
+                    statusDotColor = const Color(0xFFE11D48);
+                    break;
+                  case NoteStatus.verifying:
+                    statusDotColor = const Color(0xFFF59E0B);
+                    break;
+                  case NoteStatus.pending:
+                    statusDotColor = AppGlass.textMuted(context);
+                    break;
+                }
 
-        // List of Promissory Notes
-        Expanded(
-          child: filteredNotes.isEmpty
-              ? Center(
-                  child: GlassCard(
-                    margin: const EdgeInsets.all(24),
-                    padding: const EdgeInsets.all(28),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          CupertinoIcons.doc_text_search,
-                          size: 46,
-                          color: AppGlass.textMuted(context),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Bu filtreye uygun senet bulunamadı.',
-                          style: TextStyle(
-                            color: AppGlass.textSecondary(context),
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: GestureDetector(
+                    onTap: () {
+                      if (note.status != NoteStatus.paid) {
+                        showUploadReceiptSheet(
+                          context,
+                          appState,
+                          preselectedNote: note,
+                        );
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(11),
+                            child: SizedBox(
+                              width: 50,
+                              height: 40,
+                              child: Image.asset(
+                                customer.projectImageAsset,
+                                fit: BoxFit.cover,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(width: 10),
+                          Expanded(
+                            flex: 5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${customer.projectTitle} • ${note.senetNo}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: -0.2,
+                                    color: AppGlass.textPrimary(context),
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  '${note.installmentIndex}/${note.totalInstallments}. Elden Senet',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    color: AppGlass.textMuted(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: statusDotColor,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Flexible(
+                                      child: Text(
+                                        formatShortDate(note.dueDate),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color:
+                                              AppGlass.textSecondary(context),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 3),
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 11),
+                                  child: Text(
+                                    note.status.label,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: note.status == NoteStatus.overdue
+                                          ? const Color(0xFFE11D48)
+                                          : AppGlass.textMuted(context),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  formatCompactCurrency(note.amount),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppGlass.textPrimary(context),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
-                  itemCount: filteredNotes.length,
-                  itemBuilder: (context, index) {
-                    final note = filteredNotes[index];
-                    return _buildNoteCard(context, note);
-                  },
-                ),
+                );
+              }),
+            ],
+          ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildFilterChip({
-    required String label,
-    required bool isSelected,
-    required bool isDark,
-    Color? color,
-    required VoidCallback onTap,
-  }) {
-    final activeColor = color ?? const Color(0xFF0F172A);
-    return CupertinoButton(
-      padding: EdgeInsets.zero,
-      minimumSize: Size.zero,
-      pressedOpacity: 0.7,
-      onPressed: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? activeColor
-              : (isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : const Color(0xFF0F172A).withValues(alpha: 0.06)),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected
-                ? activeColor
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.16)
-                    : const Color(0xFF0F172A).withValues(alpha: 0.10)),
-            width: 0.8,
-          ),
-        ),
-        child: Text(
+class _SmallSummaryDetail extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _SmallSummaryDetail({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 12.5,
-            letterSpacing: -0.2,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-            color: isSelected
-                ? Colors.white
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.82)
-                    : const Color(0xFF334155)),
+            fontSize: 10.5,
+            fontWeight: FontWeight.w500,
+            color: AppGlass.textMuted(context),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildNoteCard(BuildContext context, PromissoryNote note) {
-    return GlassCard(
-      margin: const EdgeInsets.only(bottom: 12),
-      borderRadius: 22,
-      tone: note.status == NoteStatus.overdue
-          ? GlassCardTone.urgentRed
-          : GlassCardTone.standard,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: AppGlass.subtleSurface(context),
-                  borderRadius: BorderRadius.circular(9),
-                  border: Border.all(
-                    color: AppGlass.dividerColor(context),
-                    width: 0.6,
-                  ),
-                ),
-                child: Text(
-                  '${note.installmentIndex} / ${note.totalInstallments}. SENET',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppGlass.textPrimary(context),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  note.senetNo,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.3,
-                    color: AppGlass.textPrimary(context),
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
-                decoration: BoxDecoration(
-                  color: note.status.bgColor,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: note.status.color.withValues(alpha: 0.50),
-                    width: 0.7,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      note.status.icon,
-                      size: 13.5,
-                      color: note.status.color,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      note.status.label,
-                      style: TextStyle(
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w700,
-                        color: note.status.color,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+        const SizedBox(height: 3),
+        Text(
+          value,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: AppGlass.textPrimary(context),
           ),
-          const SizedBox(height: 10),
-          Text(
-            note.description,
-            style: TextStyle(
-              fontSize: 13,
-              color: AppGlass.textSecondary(context),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            child: Divider(height: 1, color: AppGlass.dividerColor(context)),
-          ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Vade Tarihi',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: AppGlass.textMuted(context),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    formatDate(note.dueDate),
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
-                      color: AppGlass.textPrimary(context),
-                    ),
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Senet Tutarı',
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      color: AppGlass.textMuted(context),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    formatCurrency(note.amount),
-                    style: TextStyle(
-                      fontSize: 17.5,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                      color: AppGlass.textPrimary(context),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          if (note.rejectionReason != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF453A).withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFFF453A).withValues(alpha: 0.45),
-                  width: 0.7,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    CupertinoIcons.exclamationmark_circle_fill,
-                    size: 16,
-                    color: Color(0xFFE11D48),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Red Açıklaması: ${note.rejectionReason}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppGlass.textPrimary(context),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          if (note.status == NoteStatus.verifying &&
-              note.receiptFileName != null) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF9F0A).withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.45),
-                  width: 0.7,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    CupertinoIcons.doc_text_fill,
-                    size: 16,
-                    color: Color(0xFFD97706),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Yüklenen Dekont: ${note.receiptFileName} (${note.paymentMethod ?? ""})',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppGlass.textPrimary(context),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 14),
-          if (note.status == NoteStatus.paid)
-            Row(
-              children: [
-                const Icon(
-                  CupertinoIcons.checkmark_seal_fill,
-                  size: 16,
-                  color: Color(0xFF30D158),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Ödeme: ${note.paidDate != null ? formatShortDate(note.paidDate!) : "-"} • ${note.paymentMethod ?? "Tahsil Edildi"}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF30D158),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            )
-          else
-            Row(
-              children: [
-                Expanded(
-                  child: IosGlassButton(
-                    isSecondaryGlass: true,
-                    icon: CupertinoIcons.building_2_fill,
-                    label: 'IBAN ile Öde',
-                    onTap: () {
-                      Clipboard.setData(
-                        ClipboardData(
-                          text:
-                              '${note.senetNo} - ${widget.appState.currentCustomer.name}',
-                        ),
-                      );
-                      showIbanSheet(context, widget.appState);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: IosGlassButton(
-                    isDestructive: note.status == NoteStatus.overdue,
-                    icon: CupertinoIcons.arrow_up_doc_fill,
-                    label: note.status == NoteStatus.verifying
-                        ? 'Dekont Güncelle'
-                        : 'Dekont Yükle',
-                    onTap: () => showUploadReceiptSheet(
-                      context,
-                      widget.appState,
-                      preselectedNote: note,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
