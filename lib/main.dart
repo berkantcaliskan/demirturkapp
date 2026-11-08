@@ -427,51 +427,74 @@ class _MainShellState extends State<MainShell> {
           ];
 
     final bottomPad = (bottomNavSafeSpacing * 0.55).clamp(10.0, 22.0);
+    final bgBase = isDark ? const Color(0xFF141312) : const Color(0xFFEEF2F6);
 
     return SizedBox(
-      height: 64 + bottomPad,
+      height: 70 + bottomPad,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Keskin çerçeve/katman olmadan, arka plana dahil gibi görünen ama
-          // altında kalan sayfa içeriğini yumuşakça blurlayan katman
+          // Keskin çerçeve/katman olmadan, arka plana dahil gibi görünen ve
+          // altında kalan sayfa içeriğini kademeli olarak güçlü biçimde blurlayan katmanlar.
+          // Not: ShaderMask içinde BackdropFilter kullanıldığında CanvasKit'te
+          // saveLayer nedeniyle arka plan blurlanmadığından doğrudan kademeli ClipRect + BackdropFilter kullanılır.
           Positioned.fill(
-            child: ShaderMask(
-              shaderCallback: (rect) {
-                return const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Color(0xCCFFFFFF),
-                    Colors.white,
-                  ],
-                  stops: [0.0, 0.28, 1.0],
-                ).createShader(rect);
-              },
-              blendMode: BlendMode.dstIn,
-              child: ClipRect(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: isDark
-                            ? [
-                                Colors.transparent,
-                                const Color(0xFF141312).withValues(alpha: 0.72),
-                                const Color(0xFF141312).withValues(alpha: 0.92),
-                              ]
-                            : [
-                                Colors.transparent,
-                                const Color(0xFFEEF2F6).withValues(alpha: 0.72),
-                                const Color(0xFFEEF2F6).withValues(alpha: 0.92),
-                              ],
-                        stops: const [0.0, 0.32, 1.0],
-                      ),
-                    ),
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 5,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 11,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 16,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 38, sigmaY: 38),
+                child: const SizedBox.expand(),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      bgBase.withValues(alpha: 0.0),
+                      bgBase.withValues(alpha: isDark ? 0.30 : 0.26),
+                      bgBase.withValues(alpha: isDark ? 0.56 : 0.48),
+                    ],
+                    stops: const [0.0, 0.26, 1.0],
                   ),
                 ),
               ),
@@ -480,7 +503,7 @@ class _MainShellState extends State<MainShell> {
 
           // Sekmeler ve sağa-sola kayan aktif sekme göstergesi (etrafında kutu/katman yok)
           Padding(
-            padding: EdgeInsets.fromLTRB(20, 8, 20, bottomPad),
+            padding: EdgeInsets.fromLTRB(20, 14, 20, bottomPad),
             child: Stack(
               children: [
                 // Seçili sekmeye doğru sağa/sola kayan aktif gösterge
