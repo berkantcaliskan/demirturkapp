@@ -91,7 +91,7 @@ class AppState extends ChangeNotifier {
   final List<SalesAdvisor> _salesAdvisors = [
     SalesAdvisor(
       id: 'adv_1',
-      name: 'Selim Demirtürk',
+      name: 'Ertuğrul Demirtürk',
       roleTitle: 'Kıdemli Satış Danışmanı',
       phone: '+90 543 667 34 54',
       photoUrl:
