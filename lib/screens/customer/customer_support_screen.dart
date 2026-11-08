@@ -575,6 +575,58 @@ class _InlineConversationPageState extends State<_InlineConversationPage> {
                       ),
                     ),
                   ),
+                  if (liveTicket.channel == 'advisor')
+                    CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      pressedOpacity: 0.72,
+                      onPressed: () {
+                        final digits = widget.advisor.phone.replaceAll(
+                          RegExp(r'[^0-9+]'),
+                          '',
+                        );
+                        final telUrl = digits.isNotEmpty
+                            ? 'tel:$digits'
+                            : CustomerSupportScreen.companyPhoneTelUrl;
+                        launchPhoneDialer(telUrl);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark
+                              ? const Color(0xFFF5F3F0)
+                              : const Color(0xFF1E293B),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              CupertinoIcons.phone_fill,
+                              size: 13.5,
+                              color: isDark
+                                  ? const Color(0xFF141312)
+                                  : Colors.white,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Ara',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                                color: isDark
+                                    ? const Color(0xFF141312)
+                                    : Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
