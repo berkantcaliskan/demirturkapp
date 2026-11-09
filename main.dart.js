@@ -81745,8 +81745,8 @@ n.toString
 q=A.b1(h,A.cd(q,A.M(n).ax.a===B.i?B.C:B.x,h,17),B.o,h,h,new A.az(p,h,h,o,h,h,h,B.v),34,h,h,34)
 p=i.c
 p.toString
-o=A.Z("G\xf6r\xfcn\xfcm Modu",h,h,A.a4(h,h,A.M(p).ax.a===B.i?B.C:B.x,h,h,h,h,h,h,h,h,14.5,h,h,B.M,h,h,!0,h,-0.2,h,h,h,h,h,h),h)
-p=s?"Koyu G\xf6r\xfcn\xfcm Aktif":"Ayd\u0131nl\u0131k G\xf6r\xfcn\xfcm Aktif"
+o=A.Z("G\xf6r\xfcn\xfcm",h,h,A.a4(h,h,A.M(p).ax.a===B.i?B.C:B.x,h,h,h,h,h,h,h,h,14.5,h,h,B.M,h,h,!0,h,-0.2,h,h,h,h,h,h),h)
+p=s?"Koyu g\xf6r\xfcn\xfcm":"Ayd\u0131nl\u0131k g\xf6r\xfcn\xfcm"
 n=i.c
 n.toString
 m=t.p
@@ -82138,18 +82138,18 @@ a0=a.length
 l=p.length
 k=l!==0?B.b.gK(p):d
 j=a.length
-i=A.aD(A.Z("Bu D\xf6nemdeki Senet & Taksitleriniz",d,B.a5,A.a4(d,d,A.M(a4).ax.a===B.i?B.C:B.x,d,d,d,d,d,d,d,d,15,d,d,B.M,d,d,!0,d,-0.3,d,d,d,d,d,d),d),1)
+i=A.aD(A.Z("Bu d\xf6nemdeki senet & taksitleriniz",d,B.a5,A.a4(d,d,A.M(a4).ax.a===B.i?B.C:B.x,d,d,d,d,d,d,d,d,15,d,d,B.M,d,d,!0,d,-0.3,d,d,d,d,d,d),d),1)
 h=A.cz(a4)
 g=A.bb(16)
 f=A.Z("Ekstre",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.C:B.x,d,d,d,d,d,d,d,d,11.5,d,d,B.M,d,d,!0,d,d,d,d,d,d,d,d),d)
 i=A.b0(A.b([i,B.b9,A.cv(B.A,d,A.b1(d,A.b0(A.b([f,B.dU,A.cd(B.cw,A.M(a4).ax.a===B.i?B.a2:B.Z,d,11)],m),B.p,B.m,B.aF),B.o,d,d,new A.az(h,d,d,g,d,d,d,B.v),d,d,B.Fk,d),d,B.a3,d,B.z,new A.a0Z(e,a4),B.a_,0.4)],m),B.p,B.cy,B.n)
-h=A.aD(A.Z("Konut & Senet",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.O:B.L,d,d,d,d,d,d,d,d,11,d,d,B.H,d,d,!0,d,d,d,d,d,d,d,d),d),5)
-g=A.aD(A.Z("Vade Tarihi",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.O:B.L,d,d,d,d,d,d,d,d,11,d,d,B.H,d,d,!0,d,d,d,d,d,d,d,d),d),3)
+h=A.aD(A.Z("Konut & senet",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.O:B.L,d,d,d,d,d,d,d,d,11,d,d,B.H,d,d,!0,d,d,d,d,d,d,d,d),d),5)
+g=A.aD(A.Z("Vade tarihi",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.O:B.L,d,d,d,d,d,d,d,d,11,d,d,B.H,d,d,!0,d,d,d,d,d,d,d,d),d),3)
 i=A.b([i,B.aj,new A.aV(B.jY,A.b0(A.b([h,g,A.aD(A.Z("Tutar",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.O:B.L,d,d,d,d,d,d,d,d,11,d,d,B.H,d,d,!0,d,d,d,d,d,d,d,d),B.dX),3)],m),B.p,B.m,B.n),d),B.is,A.m7(A.ds(a4),1),B.aY],m)
 c=A.j1(a,0,A.nO(3,"count",t.S),c.c)
 B.b.O(i,new A.a_(c,new A.a1_(e,a4,b),c.$ti.h("a_<av.E,i>")))
 i.push(B.bm)
-c=A.Z("T\xfcm\xfcn\xfc G\xf6r",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.a2:B.Z,d,d,d,d,d,d,d,d,12.5,d,d,B.M,d,d,!0,d,-0.2,d,d,d,d,d,d),d)
+c=A.Z("T\xfcm\xfcn\xfc g\xf6r",d,d,A.a4(d,d,A.M(a4).ax.a===B.i?B.a2:B.Z,d,d,d,d,d,d,d,d,12.5,d,d,B.M,d,d,!0,d,-0.2,d,d,d,d,d,d),d)
 i.push(new A.dd(B.bn,d,d,A.cv(B.A,d,A.b0(A.b([c,B.dU,A.cd(B.cw,A.M(a4).ax.a===B.i?B.a2:B.Z,d,13)],m),B.p,B.m,B.aF),d,B.a3,d,B.z,new A.a10(e),B.nW,0.4),d))
 return A.mx(A.b([q,B.bm,new A.TL(b,a3,a2,a1,s,a0,r.ax.a===B.i,new A.a11(e,a4,n),new A.a12(e),d),B.aj,new A.T_(s,a0,l,d),B.aj,new A.SL(b,k,s,j,new A.a13(e,p,a4),d),B.aj,A.e3(24,A.bl(i,B.D,B.m,B.n),d,B.hm,B.aP)],m),B.Fw,!1)},
 ady(a){A.Yc(new A.a0T(this),a,t.z)}}
@@ -82241,7 +82241,7 @@ r=A.Z(s.gtU(),d,d,A.a4(d,d,b,d,d,d,d,d,d,d,d,23,d,d,B.B,d,1.15,!0,d,-0.5,d,d,d,d
 q=A.Z(s.gWB(),d,d,A.a4(d,d,a,d,d,d,d,d,d,d,d,13.5,d,d,B.H,d,1.2,!0,d,-0.2,d,d,d,d,d,d),d)
 p=c?B.f:B.x
 o=A.bb(20)
-p=A.cv(B.A,d,A.b1(d,A.Z("\xd6deme Bildir",d,d,A.a4(d,d,c?B.a9:B.f,d,d,d,d,d,d,d,d,12.5,d,d,B.B,d,d,!0,d,-0.2,d,d,d,d,d,d),d),B.o,d,d,new A.az(p,d,d,o,d,d,d,B.v),d,d,B.FK,d),d,B.a3,d,B.z,e.y,B.a_,0.8)
+p=A.cv(B.A,d,A.b1(d,A.Z("\xd6deme bildir",d,d,A.a4(d,d,c?B.a9:B.f,d,d,d,d,d,d,d,d,12.5,d,d,B.B,d,d,!0,d,-0.2,d,d,d,d,d,d),d),B.o,d,d,new A.az(p,d,d,o,d,d,d,B.v),d,d,B.FK,d),d,B.a3,d,B.z,e.y,B.a_,0.8)
 o=A.bb(20)
 n=A.oW(11,11)
 m=t.W
@@ -82395,7 +82395,7 @@ a5.az(b0,new A.j(h-p/2,18-a7.gaM(a7)/2))},
 e9(a){return a.b!==this.b||a.c!==this.c||a.d!==this.d}}
 A.SL.prototype={
 N(a){var s,r,q,p,o,n,m,l,k=this,j=null,i=k.d,h=i!=null,g=A.M(a).ax.a===B.i?B.nu:B.nh,f=h?B.kD:B.oq
-if(h){s=A.Z("Gecikmi\u015f Senet",j,j,A.a4(j,j,A.M(a).ax.a===B.i?B.C:B.x,j,j,j,j,j,j,j,j,14,j,j,B.M,j,j,!0,j,j,j,j,j,j,j,j),j)
+if(h){s=A.Z("Gecikmi\u015f senet",j,j,A.a4(j,j,A.M(a).ax.a===B.i?B.C:B.x,j,j,j,j,j,j,j,j,14,j,j,B.M,j,j,!0,j,j,j,j,j,j,j,j),j)
 r=A.cE(A.iw(j,j,j,new A.vn(A.M(a).ax.a===B.i?B.a2:B.Z,j),B.z),16,50)
 q=i.d
 p=i.e
@@ -82418,7 +82418,7 @@ p=k.c
 o=A.lV(A.bb(12),A.cE(A.oV(p.gnm(),B.A,j,j,B.co,j,j),78,1/0))
 p=p.gtU()
 p=A.Z(p,1,B.a5,A.a4(j,j,A.M(a).ax.a===B.i?B.C:B.x,j,j,j,j,j,j,j,j,11.5,j,j,B.M,j,j,!0,j,j,j,j,j,j,j,j),j)
-n=h?"Dekont Y\xfckle \u2192":"\xd6demelerim \u2192"
+n=h?"Dekont y\xfckle \u2192":"\xd6demelerim \u2192"
 if(h)m=A.M(a).ax.a===B.i?B.a2:B.Z
 else m=g
 l=t.p
@@ -82449,19 +82449,19 @@ o=A.dc(d)
 o=A.Z(o,k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.C:B.x,k,k,k,k,k,k,k,k,30,k,k,B.c2,k,1.1,!0,k,-0.9,k,k,k,k,k,k),k)
 n=A.aD(new A.qF("Toplam",A.wc(f),k),1)
 m=A.aD(new A.qF("\xd6denen",A.wc(e),k),1)
-r=A.aD(new A.qF("Kalan Senet",""+(r-s)+" / "+h.length,k),1)
+r=A.aD(new A.qF("Kalan senet",""+(r-s)+" / "+h.length,k),1)
 l=t.p
-r=A.bl(A.b([j,B.bP,o,B.aj,A.b0(A.b([n,m,r,A.aD(new A.qF("S\u0131radaki Vade",p!=null?A.lL(p.r):"-",k),1)],l),B.p,B.m,B.n)],l),B.D,B.m,B.n)
+r=A.bl(A.b([j,B.bP,o,B.aj,A.b0(A.b([n,m,r,A.aD(new A.qF("S\u0131radaki vade",p!=null?A.lL(p.r):"-",k),1)],l),B.p,B.m,B.n)],l),B.D,B.m,B.n)
 m=A.cz(a)
 n=A.bb(11)
 j=A.b1(k,A.cd(B.Gw,A.M(a).ax.a===B.i?B.C:B.x,k,16),B.o,k,k,new A.az(m,k,k,n,k,k,k,B.v),34,k,k,34)
-o=A.aD(A.Z("\xd6deme Bilgileri",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.C:B.x,k,k,k,k,k,k,k,k,14,k,k,B.M,k,k,!0,k,-0.2,k,k,k,k,k,k),k),1)
+o=A.aD(A.Z("\xd6deme bilgileri",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.C:B.x,k,k,k,k,k,k,k,k,14,k,k,B.M,k,k,!0,k,-0.2,k,k,k,k,k,k),k),1)
 j=A.e3(20,A.b0(A.b([j,B.lL,o,A.cd(B.cw,A.M(a).ax.a===B.i?B.a2:B.Z,k,14)],l),B.p,B.m,B.n),k,B.nR,B.aP)
 o=A.Z("Senetler",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.C:B.x,k,k,k,k,k,k,k,k,15,k,k,B.M,k,k,!0,k,-0.3,k,k,k,k,k,k),k)
 n=h.length
 o=A.b0(A.b([o,A.Z(""+s+" / "+n+" Taksit",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11.5,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),k)],l),B.p,B.cy,B.n)
-n=A.aD(A.Z("Konut & Senet",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),k),5)
-m=A.aD(A.Z("Vade Tarihi",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),k),3)
+n=A.aD(A.Z("Konut & senet",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),k),5)
+m=A.aD(A.Z("Vade tarihi",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),k),3)
 o=A.b([o,B.aj,new A.aV(B.jY,A.b0(A.b([n,m,A.aD(A.Z("Tutar",k,k,A.a4(k,k,A.M(a).ax.a===B.i?B.O:B.L,k,k,k,k,k,k,k,k,11,k,k,B.H,k,k,!0,k,k,k,k,k,k,k,k),B.dX),3)],l),B.p,B.m,B.n),k),B.is,A.m7(A.ds(a),1),B.aY],l)
 B.b.O(o,new A.a_(h,new A.a17(this,a,i),g.h("a_<1,i>")))
 return A.mx(A.b([new A.aV(B.jX,r,k),B.dV,j,B.aj,A.e3(24,A.bl(o,B.D,B.m,B.n),k,B.hm,B.aP)],l),B.nT,!1)}}
@@ -82583,7 +82583,7 @@ $S:198}
 A.Rg.prototype={
 N(a){var s,r,q,p,o,n=null,m=A.cz(a),l=A.bb(11)
 m=A.b1(n,A.cd(B.GE,A.M(a).ax.a===B.i?B.C:B.x,n,16),B.o,n,n,new A.az(m,n,n,l,n,n,n,B.v),34,n,n,34)
-l=A.aD(A.Z("Finans Uzman\u0131m\u0131z ile g\xf6r\xfc\u015f\xfcn",n,n,A.a4(n,n,A.M(a).ax.a===B.i?B.C:B.x,n,n,n,n,n,n,n,n,14.5,n,n,B.B,n,n,!0,n,-0.3,n,n,n,n,n,n),n),1)
+l=A.aD(A.Z("Finans uzman\u0131m\u0131z ile g\xf6r\xfc\u015f\xfcn",n,n,A.a4(n,n,A.M(a).ax.a===B.i?B.C:B.x,n,n,n,n,n,n,n,n,14.5,n,n,B.B,n,n,!0,n,-0.3,n,n,n,n,n,n),n),1)
 s=t.p
 l=A.b([A.b0(A.b([m,B.lL,l,A.cd(B.cw,A.M(a).ax.a===B.i?B.a2:B.Z,n,15)],s),B.p,B.m,B.n)],s)
 m=this.c
