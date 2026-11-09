@@ -157,6 +157,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _customerTabIndex = 0;
   int _adminTabIndex = 0;
+  bool _isThemeMenuOpen = false;
 
   void _switchCustomerTab(int newIndex) {
     if (newIndex == _customerTabIndex) return;
@@ -657,6 +658,47 @@ class _MainShellState extends State<MainShell> {
 
   Widget _buildCustomerSettingsTab() {
     final isDark = AppGlass.isDark(context);
+    final currentMode = widget.appState.themeMode;
+
+    String modeShortLabel(ThemeMode mode) {
+      switch (mode) {
+        case ThemeMode.system:
+          return 'Sistem';
+        case ThemeMode.light:
+          return 'Aydınlık';
+        case ThemeMode.dark:
+          return 'Koyu';
+      }
+    }
+
+    IconData modeIcon(ThemeMode mode) {
+      switch (mode) {
+        case ThemeMode.system:
+          return CupertinoIcons.device_phone_portrait;
+        case ThemeMode.light:
+          return CupertinoIcons.sun_max_fill;
+        case ThemeMode.dark:
+          return CupertinoIcons.moon_stars_fill;
+      }
+    }
+
+    final options = <(ThemeMode, String, IconData)>[
+      (
+        ThemeMode.system,
+        'Sistem',
+        CupertinoIcons.device_phone_portrait,
+      ),
+      (
+        ThemeMode.light,
+        'Aydınlık',
+        CupertinoIcons.sun_max_fill,
+      ),
+      (
+        ThemeMode.dark,
+        'Koyu',
+        CupertinoIcons.moon_stars_fill,
+      ),
+    ];
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
@@ -691,90 +733,199 @@ class _MainShellState extends State<MainShell> {
           ),
         ),
         GlassCard(
+          borderRadius: 22,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: AppGlass.subtleSurface(context),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isDark
-                      ? CupertinoIcons.moon_stars_fill
-                      : CupertinoIcons.sun_max_fill,
-                  size: 17,
-                  color: AppGlass.textPrimary(context),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    _isThemeMenuOpen = !_isThemeMenuOpen;
+                  });
+                },
+                child: Row(
                   children: [
-                    Text(
-                      'Görünüm',
-                      style: TextStyle(
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: -0.2,
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isDark
+                            ? CupertinoIcons.moon_stars_fill
+                            : CupertinoIcons.sun_max_fill,
+                        size: 17,
                         color: AppGlass.textPrimary(context),
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      isDark ? 'Koyu görünüm' : 'Aydınlık görünüm',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppGlass.textMuted(context),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Görünüm',
+                            style: TextStyle(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: AppGlass.textPrimary(context),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isDark ? 'Koyu görünüm' : 'Aydınlık görünüm',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppGlass.textMuted(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppGlass.dividerColor(context),
+                          width: 0.6,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            modeIcon(currentMode),
+                            size: 13.5,
+                            color: AppGlass.textPrimary(context),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            modeShortLabel(currentMode),
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                              color: AppGlass.textPrimary(context),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          AnimatedRotation(
+                            turns: _isThemeMenuOpen ? 0.5 : 0.0,
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            child: Icon(
+                              CupertinoIcons.chevron_down,
+                              size: 12,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              CupertinoSlidingSegmentedControl<bool>(
-                groupValue: isDark,
-                backgroundColor: AppGlass.subtleSurface(context),
-                thumbColor: isDark
-                    ? const Color(0xFF332F2B)
-                    : Colors.white,
-                children: {
-                  false: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    child: Text(
-                      'Aydınlık',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppGlass.textPrimary(context),
+              AnimatedCrossFade(
+                firstChild: const SizedBox(width: double.infinity, height: 0),
+                secondChild: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppGlass.subtleSurface(context),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppGlass.dividerColor(context),
+                        width: 0.6,
                       ),
                     ),
-                  ),
-                  true: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                    child: Column(
+                      children: options.map((opt) {
+                        final mode = opt.$1;
+                        final label = opt.$2;
+                        final icon = opt.$3;
+                        final isSelected = currentMode == mode;
+
+                        final activeBg = isDark
+                            ? const Color(0xFFF5F3F0)
+                            : const Color(0xFF1E293B);
+                        final activeFg =
+                            isDark ? const Color(0xFF121110) : Colors.white;
+
+                        return GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () {
+                            widget.appState.setThemeMode(mode);
+                            setState(() {
+                              _isThemeMenuOpen = false;
+                            });
+                          },
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            curve: Curves.easeOutCubic,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color:
+                                  isSelected ? activeBg : Colors.transparent,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  icon,
+                                  size: 15,
+                                  color: isSelected
+                                      ? activeFg
+                                      : AppGlass.textSecondary(context),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    label,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      letterSpacing: -0.2,
+                                      color: isSelected
+                                          ? activeFg
+                                          : AppGlass.textPrimary(context),
+                                    ),
+                                  ),
+                                ),
+                                if (isSelected)
+                                  Icon(
+                                    CupertinoIcons.checkmark_alt,
+                                    size: 15,
+                                    color: activeFg,
+                                  ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    child: Text(
-                      'Koyu',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppGlass.textPrimary(context),
-                      ),
-                    ),
                   ),
-                },
-                onValueChanged: (val) {
-                  if (val != null && val != isDark) {
-                    widget.appState.toggleThemeMode(context);
-                  }
-                },
+                ),
+                crossFadeState: _isThemeMenuOpen
+                    ? CrossFadeState.showSecond
+                    : CrossFadeState.showFirst,
+                duration: const Duration(milliseconds: 220),
+                sizeCurve: Curves.easeOutCubic,
               ),
             ],
           ),

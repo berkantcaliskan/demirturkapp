@@ -4,7 +4,7 @@ import '../models/app_models.dart';
 class AppState extends ChangeNotifier {
   UserRole _currentRole = UserRole.customer;
   String _selectedCustomerId = 'cust_1';
-  ThemeMode _themeMode = ThemeMode.light;
+  ThemeMode _themeMode = ThemeMode.system;
 
   UserRole get currentRole => _currentRole;
   String get selectedCustomerId => _selectedCustomerId;
@@ -15,6 +15,12 @@ class AppState extends ChangeNotifier {
       return MediaQuery.platformBrightnessOf(context) == Brightness.dark;
     }
     return _themeMode == ThemeMode.dark;
+  }
+
+  void setThemeMode(ThemeMode mode) {
+    if (_themeMode == mode) return;
+    _themeMode = mode;
+    notifyListeners();
   }
 
   void toggleThemeMode(BuildContext context) {
