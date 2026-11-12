@@ -1,22 +1,49 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
+import '../../services/portal_repository.dart';
+import '../../utils/turkish_phone_input_formatter.dart';
+import 'admin_support_inbox_screen.dart';
 import '../../widgets/website_blurred_background.dart';
 import '../customer/customer_support_screen.dart';
 
 class AdminDashboardScreen extends StatelessWidget {
   final AppState appState;
   final int activeTabIndex;
+  final PortalRepository? repository;
 
   const AdminDashboardScreen({
     super.key,
     required this.appState,
     required this.activeTabIndex,
+    this.repository,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (appState.currentRole.isSalesAdvisor) {
+      return switch (activeTabIndex) {
+        0 => _buildCustomersTab(context),
+        1 => _buildCustomersTab(context, processOnly: true),
+        2 =>
+          repository == null
+              ? _buildMessagesTab(context)
+              : AdminSupportInboxScreen(repository: repository!),
+        3 =>
+          repository == null
+              ? _buildMessagesTab(context)
+              : AdminSupportInboxScreen(
+                  repository: repository!,
+                  closedOnly: true,
+                ),
+        _ => _buildCustomersTab(context),
+      };
+    }
     switch (activeTabIndex) {
       case 0:
         return _buildApprovalsAndOverviewTab(context);
@@ -25,7 +52,16 @@ class AdminDashboardScreen extends StatelessWidget {
       case 2:
         return _buildCustomersTab(context);
       case 3:
-        return _buildMessagesTab(context);
+        return repository == null
+            ? _buildMessagesTab(context)
+            : AdminSupportInboxScreen(repository: repository!);
+      case 4:
+        return repository == null
+            ? _buildMessagesTab(context)
+            : AdminSupportInboxScreen(
+                repository: repository!,
+                closedOnly: true,
+              );
       default:
         return _buildApprovalsAndOverviewTab(context);
     }
@@ -225,26 +261,73 @@ class AdminDashboardScreen extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              CupertinoIcons.paperclip,
-                              size: 16,
-                              color: Color(0xFF64D2FF),
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Dosya: ${note.receiptFileName ?? "dekont.pdf"}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 12.5,
+                        if (note.receiptObjectPath != null &&
+                            repository != null)
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            alignment: Alignment.centerLeft,
+                            onPressed: () async {
+                              try {
+                                final uri = await repository!
+                                    .getPaymentReceiptUrl(
+                                      note.receiptObjectPath!,
+                                    );
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Dekont açılamadı: $error'),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  CupertinoIcons.paperclip,
+                                  size: 16,
                                   color: Color(0xFF64D2FF),
                                 ),
-                              ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Dekontu aç • ${note.receiptFileName ?? 'dosya'}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5,
+                                      color: Color(0xFF64D2FF),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          )
+                        else
+                          Row(
+                            children: [
+                              const Icon(
+                                CupertinoIcons.paperclip,
+                                size: 16,
+                                color: Color(0xFF64D2FF),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Dosya: ${note.receiptFileName ?? "dekont.pdf"}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.5,
+                                    color: Color(0xFF64D2FF),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         if (note.paymentMethod != null) ...[
                           const SizedBox(height: 4),
                           Text(
@@ -288,8 +371,27 @@ class AdminDashboardScreen extends StatelessWidget {
                           color: const Color(0xFF30D158),
                           icon: CupertinoIcons.checkmark_alt_circle_fill,
                           label: 'Ödemeyi Onayla',
-                          onTap: () {
-                            appState.approveNotePayment(note.id);
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.approveNotePayment(note.id);
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: note.id,
+                                  approved: true,
+                                  paymentMethod: note.paymentMethod,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Onay kaydedilemedi: $error'),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 backgroundColor: const Color(0xFF059669),
@@ -398,8 +500,30 @@ class AdminDashboardScreen extends StatelessWidget {
                           isSecondaryGlass: true,
                           icon: CupertinoIcons.bell_fill,
                           label: 'Hatırlatma Gönder',
-                          onTap: () {
-                            appState.sendPaymentReminder(note);
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.sendPaymentReminder(note);
+                            } else {
+                              try {
+                                await repository!.sendPaymentReminder(
+                                  customerId: note.customerId,
+                                  noteNumber: note.senetNo,
+                                  dueDate: formatShortDate(note.dueDate),
+                                  amountText: formatCurrency(note.amount),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Hatırlatma gönderilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -416,11 +540,33 @@ class AdminDashboardScreen extends StatelessWidget {
                         child: IosGlassButton(
                           icon: CupertinoIcons.checkmark_alt_circle_fill,
                           label: 'Tahsil Edildi',
-                          onTap: () {
-                            appState.approveNotePayment(
-                              note.id,
-                              customMethod: 'Şirket Veznesi / Elden Tahsilat',
-                            );
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.approveNotePayment(
+                                note.id,
+                                customMethod: 'Şirket Veznesi / Elden Tahsilat',
+                              );
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: note.id,
+                                  approved: true,
+                                  paymentMethod:
+                                      'Şirket Veznesi / Elden Tahsilat',
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Tahsilat kaydedilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
@@ -565,8 +711,29 @@ class AdminDashboardScreen extends StatelessWidget {
                       CupertinoButton(
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
-                        onPressed: () {
-                          appState.approveNotePayment(note.id);
+                        onPressed: () async {
+                          if (repository == null) {
+                            appState.approveNotePayment(note.id);
+                          } else {
+                            try {
+                              await repository!.reviewPaymentSubmission(
+                                noteId: note.id,
+                                approved: true,
+                                paymentMethod: note.paymentMethod,
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Güncelleme kaydedilemedi: $error',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                          }
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -582,8 +749,8 @@ class AdminDashboardScreen extends StatelessWidget {
                             vertical: 3.5,
                           ),
                           decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF0A84FF).withValues(alpha: 0.25),
+                            color: const Color(0xFF0A84FF)
+                                .withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: const Color(0xFF64D2FF)
@@ -620,7 +787,12 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildCustomersTab(BuildContext context) {
+  Widget _buildCustomersTab(BuildContext context, {bool processOnly = false}) {
+    final visibleCustomers = [...appState.customers];
+    visibleCustomers.sort((a, b) {
+      final folderOrder = (a.folderName ?? '').compareTo(b.folderName ?? '');
+      return folderOrder == 0 ? a.name.compareTo(b.name) : folderOrder;
+    });
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
@@ -628,7 +800,9 @@ class AdminDashboardScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Kayıtlı Müşteriler (${appState.customers.length})',
+              processOnly
+                  ? 'İnşaat Süreçleri (${appState.customers.length})'
+                  : 'Kayıtlı Müşteriler (${appState.customers.length})',
               style: const TextStyle(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
@@ -636,18 +810,27 @@ class AdminDashboardScreen extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-            IosGlassButton(
-              onTap: () => _showAddCustomerSheet(context),
-              color: const Color(0xFFFF9F0A),
-              icon: CupertinoIcons.person_add_solid,
-              label: 'Yeni Müşteri Ekle',
-              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
-              borderRadius: 18,
-            ),
+            if (!processOnly && appState.currentRole.canManageAllCustomers)
+              IosGlassButton(
+                onTap: () => _showAddCustomerSheet(context),
+                color: const Color(0xFFFF9F0A),
+                icon: CupertinoIcons.person_add_solid,
+                label: 'Yeni Müşteri Ekle',
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 8,
+                ),
+                borderRadius: 18,
+              ),
           ],
         ),
         const SizedBox(height: 12),
-        ...appState.customers.map((c) {
+        if (!processOnly && repository != null)
+          _CustomerFolderManager(
+            repository: repository!,
+            customers: visibleCustomers,
+          ),
+        ...visibleCustomers.map((c) {
           final total = appState.getCustomerTotalAmount(c.id);
           final paid = appState.getCustomerPaidAmount(c.id);
           final remaining = appState.getCustomerRemainingAmount(c.id);
@@ -702,12 +885,27 @@ class AdminDashboardScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Sözleşme: ${c.contractNo} • Tel: ${c.phone}',
+                            '${c.folderName == null ? '' : '[${c.folderName}] • '}${c.contractNo.isEmpty ? 'Sözleşme bekliyor' : 'Sözleşme: ${c.contractNo}'} • Tel: ${c.phone}',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppGlass.textMuted(context),
                             ),
                           ),
+                          if (c.contractPending ||
+                              (c.projectStatus?.trim().isNotEmpty ??
+                                  false)) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              c.contractPending
+                                  ? 'Sözleşme onay bekliyor'
+                                  : c.projectStatus!,
+                              style: const TextStyle(
+                                color: Color(0xFFFF9F0A),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -741,37 +939,45 @@ class AdminDashboardScreen extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 12),
-                  child:
-                      Divider(height: 1, color: AppGlass.dividerColor(context)),
+                  child: Divider(
+                    height: 1,
+                    color: AppGlass.dividerColor(context),
+                  ),
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildMiniBalance(
-                        context,
-                        'Toplam Senet',
-                        formatCurrency(total),
-                        Colors.white,
+                if (repository != null)
+                  _CustomerFolderAssignment(
+                    repository: repository!,
+                    customer: c,
+                  ),
+                if (appState.currentRole.canSeePromissoryNotes)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Toplam Senet',
+                          formatCurrency(total),
+                          Colors.white,
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _buildMiniBalance(
-                        context,
-                        'Tahsil Edilen',
-                        formatCurrency(paid),
-                        const Color(0xFF30D158),
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Tahsil Edilen',
+                          formatCurrency(paid),
+                          const Color(0xFF30D158),
+                        ),
                       ),
-                    ),
-                    Expanded(
-                      child: _buildMiniBalance(
-                        context,
-                        'Kalan Bakiye',
-                        formatCurrency(remaining),
-                        const Color(0xFFFF453A),
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Kalan Bakiye',
+                          formatCurrency(remaining),
+                          const Color(0xFFFF453A),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
           );
@@ -798,8 +1004,9 @@ class AdminDashboardScreen extends StatelessWidget {
         const SizedBox(height: 12),
         ...tickets.map((ticket) {
           final customer = appState.getCustomerById(ticket.customerId);
-          final lastMsg =
-              ticket.messages.isNotEmpty ? ticket.messages.last : null;
+          final lastMsg = ticket.messages.isNotEmpty
+              ? ticket.messages.last
+              : null;
 
           return GlassCard(
             margin: const EdgeInsets.only(bottom: 12),
@@ -839,16 +1046,16 @@ class AdminDashboardScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: ticket.isResolved
                                     ? const Color(0xFF30D158)
-                                        .withValues(alpha: 0.22)
+                                          .withValues(alpha: 0.22)
                                     : const Color(0xFFFF9F0A)
-                                        .withValues(alpha: 0.22),
+                                          .withValues(alpha: 0.22),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: ticket.isResolved
                                       ? const Color(0xFF30D158)
-                                          .withValues(alpha: 0.5)
+                                            .withValues(alpha: 0.5)
                                       : const Color(0xFFFFD60A)
-                                          .withValues(alpha: 0.5),
+                                            .withValues(alpha: 0.5),
                                   width: 0.6,
                                 ),
                               ),
@@ -1046,12 +1253,30 @@ class AdminDashboardScreen extends StatelessWidget {
                           isDestructive: true,
                           icon: CupertinoIcons.xmark_circle_fill,
                           label: 'Reddet',
-                          onTap: () {
-                            appState.rejectNotePayment(
-                              noteId,
-                              reasonCtrl.text.trim(),
-                            );
-                            Navigator.pop(ctx);
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.rejectNotePayment(
+                                noteId,
+                                reasonCtrl.text.trim(),
+                              );
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: noteId,
+                                  approved: false,
+                                  rejectionReason: reasonCtrl.text.trim(),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Ret kaydedilemedi: $error'),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (ctx.mounted) Navigator.pop(ctx);
                           },
                         ),
                       ),
@@ -1067,11 +1292,15 @@ class AdminDashboardScreen extends StatelessWidget {
   }
 
   void _showCreateInstallmentSheet(BuildContext context) {
+    if (appState.customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Önce bir müşteri kaydı oluşturun.')),
+      );
+      return;
+    }
     String selectedCustomerId = appState.customers.first.id;
     final amountCtrl = TextEditingController(text: '30000');
-    final descCtrl = TextEditingController(
-      text: 'Yeni Sözleşme Senet Planı',
-    );
+    final descCtrl = TextEditingController(text: 'Yeni Sözleşme Senet Planı');
     int installmentCount = 6;
 
     showModalBottomSheet(
@@ -1140,7 +1369,7 @@ class AdminDashboardScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: active
                                     ? const Color(0xFF0A84FF)
-                                        .withValues(alpha: 0.85)
+                                          .withValues(alpha: 0.85)
                                     : Colors.white.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                                 border: Border.all(
@@ -1175,8 +1404,10 @@ class AdminDashboardScreen extends StatelessWidget {
                       CupertinoTextField(
                         controller: amountCtrl,
                         keyboardType: TextInputType.number,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                         padding: const EdgeInsets.all(13),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.12),
@@ -1214,7 +1445,7 @@ class AdminDashboardScreen extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: active
                                     ? const Color(0xFF0A84FF)
-                                        .withValues(alpha: 0.85)
+                                          .withValues(alpha: 0.85)
                                     : Colors.white.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -1248,8 +1479,10 @@ class AdminDashboardScreen extends StatelessWidget {
                       const SizedBox(height: 6),
                       CupertinoTextField(
                         controller: descCtrl,
-                        style:
-                            const TextStyle(color: Colors.white, fontSize: 14),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
                         padding: const EdgeInsets.all(13),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.12),
@@ -1267,19 +1500,45 @@ class AdminDashboardScreen extends StatelessWidget {
                           icon: CupertinoIcons.checkmark_alt_circle_fill,
                           label: 'Senet Planını Oluştur',
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          onTap: () {
+                          onTap: () async {
                             final amount =
                                 double.tryParse(amountCtrl.text.trim()) ??
-                                    25000.0;
-                            appState.createInstallmentPlan(
-                              customerId: selectedCustomerId,
-                              monthlyAmount: amount,
-                              installmentCount: installmentCount,
-                              firstDueDate: DateTime(2026, 12, 15),
-                              descriptionPrefix: descCtrl.text.trim().isEmpty
-                                  ? 'Senet Ödemesi'
-                                  : descCtrl.text.trim(),
-                            );
+                                25000.0;
+                            if (repository == null) {
+                              appState.createInstallmentPlan(
+                                customerId: selectedCustomerId,
+                                monthlyAmount: amount,
+                                installmentCount: installmentCount,
+                                firstDueDate: DateTime(2026, 12, 15),
+                                descriptionPrefix: descCtrl.text.trim().isEmpty
+                                    ? 'Senet Ödemesi'
+                                    : descCtrl.text.trim(),
+                              );
+                            } else {
+                              try {
+                                await repository!.createInstallmentPlan(
+                                  customerId: selectedCustomerId,
+                                  monthlyAmount: amount,
+                                  installmentCount: installmentCount,
+                                  firstDueDate: DateTime(2026, 12, 15),
+                                  descriptionPrefix:
+                                      descCtrl.text.trim().isEmpty
+                                      ? 'Senet Ödemesi'
+                                      : descCtrl.text.trim(),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Senet planı kaydedilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!ctx.mounted || !context.mounted) return;
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
@@ -1307,91 +1566,295 @@ class AdminDashboardScreen extends StatelessWidget {
   void _showAddCustomerSheet(BuildContext context) {
     final nameCtrl = TextEditingController();
     final tcCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController(text: '+90 532 ');
-    final contractCtrl = TextEditingController(
-      text: 'DMR-2026-0${appState.customers.length + 401}',
-    );
+    final phoneCtrl = TextEditingController();
+    String? advisorId;
+    PlatformFile? contractFile;
+    Uint8List? contractFileBytes;
+    bool saving = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: IosGlassSheet(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4.5,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(10),
+        return StatefulBuilder(
+          builder: (ctx, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: IosGlassSheet(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Yeni Müşteri Cari Kaydı Oluştur',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
-                      color: Colors.white,
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Yeni Müşteri Cari Kaydı Oluştur',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        color: Colors.white,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 14),
-                  _buildSheetInput(
-                    controller: nameCtrl,
-                    placeholder: 'Müşteri Adı Soyadı / Firma Unvanı',
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetInput(
-                    controller: tcCtrl,
-                    placeholder: 'TC Kimlik No / Vergi No',
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetInput(
-                    controller: phoneCtrl,
-                    placeholder: 'Telefon Numarası',
-                  ),
-                  const SizedBox(height: 10),
-                  _buildSheetInput(
-                    controller: contractCtrl,
-                    placeholder: 'Sözleşme Numarası',
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: IosGlassButton(
-                      icon: CupertinoIcons.person_add_solid,
-                      label: 'Müşteriyi Kaydet',
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      onTap: () {
-                        if (nameCtrl.text.trim().isEmpty) return;
-                        appState.addCustomer(
-                          name: nameCtrl.text.trim(),
-                          tcOrTaxNo: tcCtrl.text.trim().isEmpty
-                              ? '11111111110'
-                              : tcCtrl.text.trim(),
-                          phone: phoneCtrl.text.trim(),
-                          email: 'musteri@eposta.com',
-                          address: 'Karasu / Sakarya',
-                          contractNo: contractCtrl.text.trim(),
+                    const SizedBox(height: 14),
+                    _buildSheetInput(
+                      controller: nameCtrl,
+                      placeholder: 'Müşteri Adı Soyadı / Firma Unvanı',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildSheetInput(
+                      controller: tcCtrl,
+                      placeholder: 'TC Kimlik No / Vergi No',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildSheetInput(
+                      controller: phoneCtrl,
+                      placeholder: '5XX XXX XX XX',
+                      prefixText: '+90',
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [TurkishPhoneInputFormatter()],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.all(13),
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final picked = await FilePicker.pickFile(
+                                  type: FileType.custom,
+                                  allowedExtensions: const [
+                                    'pdf',
+                                    'doc',
+                                    'docx',
+                                  ],
+                                );
+                                if (picked == null) return;
+                                final bytes = await picked.readAsBytes();
+                                if (bytes.isEmpty) {
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Dosya okunamadı. Tekrar seçin.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                setModalState(() {
+                                  contractFile = picked;
+                                  contractFileBytes = bytes;
+                                });
+                              },
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.doc_text,
+                              color: Color(0xFFE11D48),
+                              size: 19,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                contractFile?.name ??
+                                    'Sözleşme dosyası seç (PDF / Word) *',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ),
+                            if (contractFile != null)
+                              const Icon(
+                                CupertinoIcons.checkmark_circle_fill,
+                                color: Color(0xFF34C759),
+                                size: 18,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future:
+                          repository?.loadSalesAdvisors() ??
+                          Future.value(const <Map<String, dynamic>>[]),
+                      builder: (context, snapshot) {
+                        final advisors = snapshot.data ?? const [];
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const LinearProgressIndicator();
+                        }
+                        if (advisors.isEmpty) {
+                          return const Text(
+                            'Önce en az bir Satış Danışmanı hesabı tanımlayın.',
+                            style: TextStyle(color: Color(0xFFFF9F0A)),
+                          );
+                        }
+                        advisorId ??= advisors.first['id']?.toString();
+                        return StatefulBuilder(
+                          builder: (context, setFieldState) {
+                            final contractYear = DateTime.now().year;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  initialValue: advisorId,
+                                  dropdownColor: const Color(0xFF242220),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Atanan satış danışmanı',
+                                    labelStyle: TextStyle(
+                                      color: Color(0xFFCDC8C0),
+                                    ),
+                                  ),
+                                  items: advisors.map((advisor) {
+                                    final staffId =
+                                        advisor['staff_id']?.toString() ?? '';
+                                    return DropdownMenuItem(
+                                      value: advisor['id'].toString(),
+                                      child: Text(
+                                        '${advisor['full_name']} • $staffId',
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) =>
+                                      setFieldState(() => advisorId = value),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Sözleşme numarası otomatik verilir. Örnek: S/${contractYear}000001 (sıra her yıl yeniden başlar)',
+                                  style: const TextStyle(
+                                    color: Color(0xFFA9A39A),
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         );
-                        Navigator.pop(ctx);
                       },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: IosGlassButton(
+                        icon: CupertinoIcons.person_add_solid,
+                        label: saving ? 'Kaydediliyor…' : 'Müşteriyi Kaydet',
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        onTap: () async {
+                          if (saving) return;
+                          final name = nameCtrl.text.trim();
+                          final nationalOrTaxId = tcCtrl.text.trim();
+                          final phone = phoneCtrl.text.trim();
+                          final file = contractFile;
+                          if (name.isEmpty ||
+                              nationalOrTaxId.isEmpty ||
+                              !_isValidTurkishPhone(phone) ||
+                              advisorId == null ||
+                              file == null ||
+                              contractFileBytes == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Ad, T.C./vergi no, telefon, danışman ve sözleşme dosyası zorunludur.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (repository == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Sunucu oturumu yok; müşteri Supabase’e gönderilmedi. Yönetici hesabıyla yeniden giriş yapın.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            setModalState(() => saving = true);
+                            final extension = file.name
+                                .split('.')
+                                .last
+                                .toLowerCase();
+                            final contentType = switch (extension) {
+                              'pdf' => 'application/pdf',
+                              'doc' => 'application/msword',
+                              _ => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            };
+                            final savedCustomer = await repository!
+                                .createCustomer(
+                                  name: name,
+                                  nationalOrTaxId: nationalOrTaxId,
+                                  phone: phone,
+                                  assignedAdvisorId: advisorId!,
+                                  contractDate: DateTime.now(),
+                                  contractFileName: file.name,
+                                  contractFileBytes: contractFileBytes!,
+                                  contractContentType: contentType,
+                                );
+                            appState.replaceBackendCustomers(
+                              await repository!.loadCustomers(),
+                            );
+                            if (!ctx.mounted || !context.mounted) return;
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF059669),
+                                behavior: SnackBarBehavior.floating,
+                                content: Text(
+                                  'Müşteri kaydedildi • Sözleşme: ${savedCustomer['contract_number']}',
+                                ),
+                              ),
+                            );
+                            return;
+                          } catch (error) {
+                            if (ctx.mounted) {
+                              setModalState(() => saving = false);
+                            }
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'Müşteri Supabase’e gönderilemedi: $error',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -1403,10 +1866,28 @@ class AdminDashboardScreen extends StatelessWidget {
   Widget _buildSheetInput({
     required TextEditingController controller,
     required String placeholder,
+    String? prefixText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return CupertinoTextField(
       controller: controller,
       placeholder: placeholder,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      prefix: prefixText == null
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(left: 13, right: 8),
+              child: Text(
+                prefixText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
       placeholderStyle: TextStyle(
         color: Colors.white.withValues(alpha: 0.45),
         fontSize: 13.5,
@@ -1423,4 +1904,202 @@ class AdminDashboardScreen extends StatelessWidget {
       ),
     );
   }
+
+  bool _isValidTurkishPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    return digits.length == 10 ||
+        (digits.length == 11 && digits.startsWith('0'));
+  }
+}
+
+class _CustomerFolderManager extends StatefulWidget {
+  const _CustomerFolderManager({
+    required this.repository,
+    required this.customers,
+  });
+
+  final PortalRepository repository;
+  final List<Customer> customers;
+
+  @override
+  State<_CustomerFolderManager> createState() => _CustomerFolderManagerState();
+}
+
+class _CustomerFolderManagerState extends State<_CustomerFolderManager> {
+  late Future<List<Map<String, dynamic>>> _folders = widget.repository
+      .loadCustomerFolders();
+
+  Future<void> _createFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Klasör oluştur'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Klasör adı'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Oluştur'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    try {
+      await widget.repository.createCustomerFolder(name);
+      if (mounted) {
+        setState(() => _folders = widget.repository.loadCustomerFolders());
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Klasör oluşturulamadı: $error')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => FutureBuilder<List<Map<String, dynamic>>>(
+    future: _folders,
+    builder: (context, snapshot) {
+      final folders = snapshot.data ?? const [];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${widget.customers.length} müşteri • klasör ve ada göre sıralı',
+                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 12),
+              ),
+            ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              onPressed: _createFolder,
+              child: const Text(
+                '+ Klasör',
+                style: TextStyle(color: Color(0xFF64D2FF)),
+              ),
+            ),
+            if (folders.isNotEmpty)
+              Text(
+                '${folders.length} klasör',
+                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 11),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _CustomerFolderAssignment extends StatefulWidget {
+  const _CustomerFolderAssignment({
+    required this.repository,
+    required this.customer,
+  });
+  final PortalRepository repository;
+  final Customer customer;
+
+  @override
+  State<_CustomerFolderAssignment> createState() =>
+      _CustomerFolderAssignmentState();
+}
+
+class _CustomerFolderAssignmentState extends State<_CustomerFolderAssignment> {
+  late Future<List<Map<String, dynamic>>> _folders;
+  String? _folderId;
+
+  @override
+  void initState() {
+    super.initState();
+    _folders = widget.repository.loadCustomerFolders();
+    _folderId = widget.customer.folderId;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: _folders,
+        builder: (context, snapshot) {
+          final folders = snapshot.data ?? const [];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+            );
+          }
+          if (folders.isEmpty) {
+            return CupertinoButton(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              minimumSize: Size.zero,
+              onPressed: () => setState(
+                () => _folders = widget.repository.loadCustomerFolders(),
+              ),
+              child: const Text(
+                'Klasörleri yenile',
+                style: TextStyle(color: Color(0xFF64D2FF), fontSize: 11),
+              ),
+            );
+          }
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: DropdownButton<String?>(
+              value: folders.any((folder) => folder['id'] == _folderId)
+                  ? _folderId
+                  : null,
+              hint: const Text(
+                'Klasöre ekle',
+                style: TextStyle(color: Color(0xFF64D2FF), fontSize: 12),
+              ),
+              dropdownColor: const Color(0xFF242220),
+              underline: const SizedBox.shrink(),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('Klasörsüz'),
+                ),
+                ...folders.map(
+                  (folder) => DropdownMenuItem<String?>(
+                    value: folder['id'].toString(),
+                    child: Text(folder['name'].toString()),
+                  ),
+                ),
+              ],
+              onChanged: (value) async {
+                setState(() => _folderId = value);
+                try {
+                  await widget.repository.assignCustomerFolder(
+                    customerId: widget.customer.id,
+                    folderId: value,
+                  );
+                } catch (error) {
+                  if (!context.mounted) return;
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Klasör ataması yapılamadı: $error'),
+                      ),
+                    );
+                  }
+                }
+              },
+            ),
+          );
+        },
+      );
 }

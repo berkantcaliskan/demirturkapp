@@ -1,13 +1,21 @@
 import 'package:flutter/cupertino.dart';
 
-enum UserRole { customer, admin }
+enum UserRole { customer, salesAdvisor, accounting, management, admin }
 
-enum NoteStatus {
-  paid,
-  pending,
-  overdue,
-  verifying,
+extension UserRolePermissions on UserRole {
+  bool get isStaff => this != UserRole.customer;
+
+  bool get canSeePromissoryNotes =>
+      this == UserRole.accounting ||
+      this == UserRole.management ||
+      this == UserRole.admin;
+
+  bool get canManageAllCustomers => canSeePromissoryNotes;
+
+  bool get isSalesAdvisor => this == UserRole.salesAdvisor;
 }
+
+enum NoteStatus { paid, pending, overdue, verifying }
 
 extension NoteStatusExtension on NoteStatus {
   String get label {
@@ -83,6 +91,7 @@ class SalesAdvisor {
   String get firstName => name.trim().split(RegExp(r'\s+')).first;
 
   SalesAdvisor copyWith({
+    String? id,
     String? name,
     String? roleTitle,
     String? phone,
@@ -90,7 +99,7 @@ class SalesAdvisor {
     DateTime? photoUpdatedAt,
   }) {
     return SalesAdvisor(
-      id: id,
+      id: id ?? this.id,
       name: name ?? this.name,
       roleTitle: roleTitle ?? this.roleTitle,
       phone: phone ?? this.phone,
@@ -109,6 +118,14 @@ class Customer {
   final String address;
   final String contractNo;
   final String assignedAdvisorId;
+  final String? projectName;
+  final String? unitLabel;
+  final String? projectStatus;
+  final String contractStatus;
+  final String? folderId;
+  final String? folderName;
+  final String? contractDocumentPath;
+  final String? contractDocumentName;
 
   const Customer({
     required this.id,
@@ -118,51 +135,35 @@ class Customer {
     required this.email,
     required this.address,
     required this.contractNo,
-    this.assignedAdvisorId = 'adv_1',
+    this.assignedAdvisorId = '',
+    this.projectName,
+    this.unitLabel,
+    this.projectStatus,
+    this.contractStatus = 'approved',
+    this.folderId,
+    this.folderName,
+    this.contractDocumentPath,
+    this.contractDocumentName,
   });
+
+  bool get contractPending => contractStatus != 'approved';
 
   String get firstName => name.trim().split(RegExp(r'\s+')).first;
 
   String get projectImageAsset {
-    final lower = address.toLowerCase();
-    if (lower.contains('asel') || id == 'cust_2') {
-      return 'assets/images/aselforweb.jpeg';
-    }
-    if (lower.contains('almina') || id == 'cust_3') {
-      return 'assets/images/alminaforweb.jpeg';
-    }
-    if (lower.contains('seaside')) {
-      return 'assets/images/seasideforweb.jpeg';
-    }
-    return 'assets/images/yenisehirforweb.jpeg';
+    return 'assets/images/demirturk-emblem-dark.png';
   }
 
   String get projectTitle {
-    final lower = address.toLowerCase();
-    if (lower.contains('asel') || id == 'cust_2') {
-      return 'Asel Doğa Evleri';
-    }
-    if (lower.contains('almina') || id == 'cust_3') {
-      return 'Almina Evleri';
-    }
-    if (lower.contains('seaside')) {
-      return 'Seaside House';
-    }
-    return 'Yenişehir, 3. Etap';
+    if (contractNo.trim().isEmpty) return 'Henüz sözleşmeniz atanmadı';
+    if (projectName?.trim().isNotEmpty == true) return projectName!.trim();
+    return 'Proje bilgisi bekleniyor';
   }
 
   String get unitSubtitle {
-    final lower = address.toLowerCase();
-    if (lower.contains('asel') || id == 'cust_2') {
-      return '2. Etap • B Blok Daire 4';
-    }
-    if (lower.contains('almina') || id == 'cust_3') {
-      return 'Plaj Cd. • 2. Etap Daire 7';
-    }
-    if (lower.contains('seaside')) {
-      return 'Karasu • Sahil Rezidans';
-    }
-    return 'A Blok • Daire 12';
+    if (contractNo.trim().isEmpty) return '';
+    if (unitLabel?.trim().isNotEmpty == true) return unitLabel!.trim();
+    return '';
   }
 }
 
@@ -182,6 +183,7 @@ class PromissoryNote {
   final DateTime? submittedAt;
   final String? paymentMethod;
   final String? rejectionReason;
+  final String? receiptObjectPath;
 
   const PromissoryNote({
     required this.id,
@@ -199,6 +201,7 @@ class PromissoryNote {
     this.submittedAt,
     this.paymentMethod,
     this.rejectionReason,
+    this.receiptObjectPath,
   });
 
   PromissoryNote copyWith({
@@ -209,6 +212,7 @@ class PromissoryNote {
     DateTime? submittedAt,
     String? paymentMethod,
     String? rejectionReason,
+    String? receiptObjectPath,
   }) {
     return PromissoryNote(
       id: id,
@@ -226,6 +230,7 @@ class PromissoryNote {
       submittedAt: submittedAt ?? this.submittedAt,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       rejectionReason: rejectionReason,
+      receiptObjectPath: receiptObjectPath ?? this.receiptObjectPath,
     );
   }
 }

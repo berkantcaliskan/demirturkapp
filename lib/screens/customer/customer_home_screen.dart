@@ -1,19 +1,24 @@
 import 'dart:ui';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
+import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
 import 'iban_and_statement_sheets.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   final AppState appState;
   final ValueChanged<int> onNavigateTab;
+  final PortalRepository? repository;
 
   const CustomerHomeScreen({
     super.key,
     required this.appState,
     required this.onNavigateTab,
+    this.repository,
   });
 
   String _timeBasedGreeting() {
@@ -40,15 +45,75 @@ class CustomerHomeScreen extends StatelessWidget {
     final paidCount = notes.where((n) => n.status == NoteStatus.paid).length;
     final isDark = AppGlass.isDark(context);
 
-    final overdueNotes =
-        notes.where((n) => n.status == NoteStatus.overdue).toList();
-    final nextPendingNotes =
-        notes.where((n) => n.status == NoteStatus.pending).toList();
+    final overdueNotes = notes
+        .where((n) => n.status == NoteStatus.overdue)
+        .toList();
+    final nextPendingNotes = notes
+        .where((n) => n.status == NoteStatus.pending)
+        .toList();
     final urgentNote = overdueNotes.isNotEmpty
         ? overdueNotes.first
         : (nextPendingNotes.isNotEmpty
-            ? nextPendingNotes.first
-            : (notes.isNotEmpty ? notes.first : null));
+              ? nextPendingNotes.first
+              : (notes.isNotEmpty ? notes.first : null));
+
+    if (customer.contractPending) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
+        children: [
+          Text(
+            '${_timeBasedGreeting()} ${customer.firstName}',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppGlass.textPrimary(context),
+            ),
+          ),
+          const SizedBox(height: 16),
+          GlassCard(
+            borderRadius: 22,
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  CupertinoIcons.doc_text_search,
+                  color: Color(0xFFFF9F0A),
+                  size: 24,
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Sözleşmeniz onay bekliyor',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Hesabınız kullanılabilir. Sözleşme ve proje bilgileriniz eklendiğinde bu sayfada görüntülenecek.',
+                  style: TextStyle(
+                    color: Color(0xFFA9A39A),
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                CupertinoButton.filled(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 10,
+                  ),
+                  onPressed: () => onNavigateTab(2),
+                  child: const Text('İletişime geç'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 100),
@@ -110,6 +175,7 @@ class CustomerHomeScreen extends StatelessWidget {
           onPayTap: () => showUploadReceiptSheet(
             context,
             appState,
+            repository: repository,
             preselectedNote: urgentNote,
           ),
           onDetailsTap: () => onNavigateTab(1),
@@ -136,6 +202,7 @@ class CustomerHomeScreen extends StatelessWidget {
               showUploadReceiptSheet(
                 context,
                 appState,
+                repository: repository,
                 preselectedNote: overdueNotes.first,
               );
             } else {
@@ -249,10 +316,7 @@ class CustomerHomeScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Divider(
-                height: 1,
-                color: AppGlass.dividerColor(context),
-              ),
+              Divider(height: 1, color: AppGlass.dividerColor(context)),
               const SizedBox(height: 10),
 
               ...notes.take(3).map((note) {
@@ -264,6 +328,7 @@ class CustomerHomeScreen extends StatelessWidget {
                         showUploadReceiptSheet(
                           context,
                           appState,
+                          repository: repository,
                           preselectedNote: note,
                         );
                       }
@@ -472,17 +537,17 @@ class CustomerHomeScreen extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? (isDark
-                                    ? Colors.white.withValues(alpha: 0.14)
-                                    : const Color(0xFF0F172A)
-                                        .withValues(alpha: 0.08))
+                                      ? Colors.white.withValues(alpha: 0.14)
+                                      : const Color(0xFF0F172A)
+                                            .withValues(alpha: 0.08))
                                 : AppGlass.subtleSurface(ctx),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
                               color: isSelected
                                   ? (isDark
-                                      ? Colors.white.withValues(alpha: 0.38)
-                                      : const Color(0xFF0F172A)
-                                          .withValues(alpha: 0.22))
+                                        ? Colors.white.withValues(alpha: 0.38)
+                                        : const Color(0xFF0F172A)
+                                              .withValues(alpha: 0.22))
                                   : AppGlass.dividerColor(ctx),
                               width: 0.8,
                             ),
@@ -576,8 +641,9 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     const double topOverhang = 24.0;
     final textColor = isDark ? Colors.white : const Color(0xFF1E293B);
-    final subTextColor =
-        isDark ? Colors.white.withValues(alpha: 0.72) : const Color(0xFF64748B);
+    final subTextColor = isDark
+        ? Colors.white.withValues(alpha: 0.72)
+        : const Color(0xFF64748B);
 
     // Sol kenarda blurlu ve yumuşak geçiş sağlayan alt görsel katmanı
     Widget buildSoftBlurredTransitionImage() {
@@ -594,14 +660,7 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
               Color(0xFFFFFFFF),
               Color(0xFFFFFFFF),
             ],
-            stops: [
-              0.00,
-              0.34,
-              0.41,
-              0.48,
-              0.55,
-              1.00,
-            ],
+            stops: [0.00, 0.34, 0.41, 0.48, 0.55, 1.00],
           ).createShader(rect);
         },
         blendMode: BlendMode.dstIn,
@@ -640,14 +699,7 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
               Color(0xFFFFFFFF),
               Color(0xFFFFFFFF),
             ],
-            stops: [
-              0.00,
-              0.39,
-              0.45,
-              0.51,
-              0.56,
-              1.00,
-            ],
+            stops: [0.00, 0.39, 0.45, 0.51, 0.56, 1.00],
           ).createShader(rect);
         },
         blendMode: BlendMode.dstIn,
@@ -709,9 +761,10 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(26),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFFFFF8F0).withValues(alpha: 0.08)
+                                ? const Color(0xFFFFF8F0)
+                                      .withValues(alpha: 0.08)
                                 : const Color(0xFF0F172A)
-                                    .withValues(alpha: 0.05),
+                                      .withValues(alpha: 0.05),
                             width: 0.7,
                           ),
                         ),
@@ -785,8 +838,12 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 11, sigmaY: 11),
                             child: Container(
-                              padding:
-                                  const EdgeInsets.fromLTRB(14, 12, 10, 11),
+                              padding: const EdgeInsets.fromLTRB(
+                                14,
+                                12,
+                                10,
+                                11,
+                              ),
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   begin: Alignment.centerLeft,
@@ -815,7 +872,7 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
                                   color: isDark
                                       ? Colors.white.withValues(alpha: 0.08)
                                       : const Color(0xFF0F172A)
-                                          .withValues(alpha: 0.06),
+                                            .withValues(alpha: 0.06),
                                   width: 0.6,
                                 ),
                               ),
@@ -972,7 +1029,8 @@ class _BuildingTopOverhangClipper extends CustomClipper<Path> {
       ];
     }
 
-    final Path buildingPath = Path()..moveTo(roofPoints.first.dx, roofPoints.first.dy);
+    final Path buildingPath = Path()
+      ..moveTo(roofPoints.first.dx, roofPoints.first.dy);
     for (int i = 1; i < roofPoints.length; i++) {
       buildingPath.lineTo(roofPoints[i].dx, roofPoints[i].dy);
     }
@@ -985,14 +1043,7 @@ class _BuildingTopOverhangClipper extends CustomClipper<Path> {
 
     // Sağdan ve soldan kartın üst köşe kavislerinin dışına taşmaması için yatay sınır
     final Path allowedTopZone = Path()
-      ..addRect(
-        Rect.fromLTRB(
-          26.0,
-          0.0,
-          size.width - 26.0,
-          seamBottom,
-        ),
-      );
+      ..addRect(Rect.fromLTRB(26.0, 0.0, size.width - 26.0, seamBottom));
 
     return Path.combine(PathOperation.intersect, buildingPath, allowedTopZone);
   }
@@ -1020,8 +1071,9 @@ class _HeroFrostedMetricItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final primaryColor = isDark ? Colors.white : const Color(0xFF0F172A);
-    final labelColor =
-        isDark ? Colors.white.withValues(alpha: 0.78) : const Color(0xFF475569);
+    final labelColor = isDark
+        ? Colors.white.withValues(alpha: 0.78)
+        : const Color(0xFF475569);
     final badgeBg = isDark
         ? Colors.white.withValues(alpha: 0.14)
         : const Color(0xFF0F172A).withValues(alpha: 0.09);
@@ -1051,11 +1103,7 @@ class _HeroFrostedMetricItem extends StatelessWidget {
                 color: badgeBg,
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: Icon(
-                icon,
-                size: 8.5,
-                color: primaryColor,
-              ),
+              child: Icon(icon, size: 8.5, color: primaryColor),
             ),
             const SizedBox(width: 4),
             Flexible(
@@ -1092,8 +1140,7 @@ class _PaymentWaveAnalyticsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Normalde %100 olan performans, gecikmiş senet oldukça düşer (ileride yönetici ayarlarına bağlanacak)
-    final int performanceScore =
-        (100 - (overdueCount * 18)).clamp(20, 100);
+    final int performanceScore = (100 - (overdueCount * 18)).clamp(20, 100);
     final isDark = AppGlass.isDark(context);
 
     return GlassCard(
@@ -1211,10 +1258,7 @@ class _DualWaveChartPainter extends CustomPainter {
     final barPath = Path()
       ..moveTo(peakX - 11, topPad + chartH)
       ..lineTo(peakX - 15, peakY)
-      ..arcToPoint(
-        Offset(peakX + 15, peakY),
-        radius: const Radius.circular(15),
-      )
+      ..arcToPoint(Offset(peakX + 15, peakY), radius: const Radius.circular(15))
       ..lineTo(peakX + 11, topPad + chartH)
       ..close();
 
@@ -1298,8 +1342,9 @@ class _DualWaveChartPainter extends CustomPainter {
         topPad + chartH * 0.68,
       );
 
-    final primaryLineColor =
-        isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final primaryLineColor = isDark
+        ? const Color(0xFFF8FAFC)
+        : const Color(0xFF1E293B);
 
     final secondCurvePaint = Paint()
       ..style = PaintingStyle.stroke
@@ -1314,17 +1359,12 @@ class _DualWaveChartPainter extends CustomPainter {
     );
 
     final pillRect = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: Offset(peakX, topPad + 2),
-        width: 40,
-        height: 19,
-      ),
+      Rect.fromCenter(center: Offset(peakX, topPad + 2), width: 40, height: 19),
       const Radius.circular(10),
     );
     canvas.drawRRect(
       pillRect,
-      Paint()
-        ..color = isDark ? Colors.white : const Color(0xFF1E293B),
+      Paint()..color = isDark ? Colors.white : const Color(0xFF1E293B),
     );
 
     final badgeTp = TextPainter(
@@ -1377,8 +1417,9 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
     final isDark = AppGlass.isDark(context);
     final note = overdueNote;
     final hasOverdue = note != null;
-    final greenAccent =
-        isDark ? const Color(0xFF22C55E) : const Color(0xFF16A34A);
+    final greenAccent = isDark
+        ? const Color(0xFF22C55E)
+        : const Color(0xFF16A34A);
 
     return GlassCard(
       borderRadius: 24,

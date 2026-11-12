@@ -1,16 +1,20 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
+import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
 import 'iban_and_statement_sheets.dart';
 
 class CustomerNotesScreen extends StatelessWidget {
   final AppState appState;
+  final PortalRepository? repository;
 
   const CustomerNotesScreen({
     super.key,
     required this.appState,
+    this.repository,
   });
 
   @override
@@ -24,9 +28,54 @@ class CustomerNotesScreen extends StatelessWidget {
     final paidCount = notes.where((n) => n.status == NoteStatus.paid).length;
     final remainingCount = notes.length - paidCount;
 
-    final unpaidNotes =
-        notes.where((n) => n.status != NoteStatus.paid).toList();
+    final unpaidNotes = notes
+        .where((n) => n.status != NoteStatus.paid)
+        .toList();
     final nextDueNote = unpaidNotes.isNotEmpty ? unpaidNotes.first : null;
+
+    if (customer.contractPending) {
+      return ListView(
+        padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
+        children: [
+          Text(
+            'Ödemelerim',
+            style: TextStyle(
+              color: AppGlass.textPrimary(context),
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          GlassCard(
+            borderRadius: 22,
+            padding: const EdgeInsets.all(18),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(CupertinoIcons.doc_text_search, color: Color(0xFFFF9F0A)),
+                SizedBox(height: 10),
+                Text(
+                  'Sözleşmeniz onay bekliyor',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Senet ve ödeme bilgileriniz sözleşmeniz onaylandığında burada yer alacak.',
+                  style: TextStyle(
+                    color: Color(0xFFA9A39A),
+                    fontSize: 12.5,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 100),
@@ -207,10 +256,7 @@ class CustomerNotesScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
-              Divider(
-                height: 1,
-                color: AppGlass.dividerColor(context),
-              ),
+              Divider(height: 1, color: AppGlass.dividerColor(context)),
               const SizedBox(height: 10),
               ...notes.map((note) {
                 final Color statusDotColor;
@@ -237,6 +283,7 @@ class CustomerNotesScreen extends StatelessWidget {
                         showUploadReceiptSheet(
                           context,
                           appState,
+                          repository: repository,
                           preselectedNote: note,
                         );
                       }
@@ -315,8 +362,9 @@ class CustomerNotesScreen extends StatelessWidget {
                                         style: TextStyle(
                                           fontSize: 11,
                                           fontWeight: FontWeight.w500,
-                                          color:
-                                              AppGlass.textSecondary(context),
+                                          color: AppGlass.textSecondary(
+                                            context,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -376,10 +424,7 @@ class _SmallSummaryDetail extends StatelessWidget {
   final String label;
   final String value;
 
-  const _SmallSummaryDetail({
-    required this.label,
-    required this.value,
-  });
+  const _SmallSummaryDetail({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {

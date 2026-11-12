@@ -1,8 +1,11 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
+import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
 
 void showIbanSheet(BuildContext context, AppState appState) {
@@ -67,10 +70,7 @@ void showIbanSheet(BuildContext context, AppState appState) {
                         ),
                         Text(
                           'FAST / EFT / Havale açıklamasına Senet No yazınız',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textMuted,
-                          ),
+                          style: TextStyle(fontSize: 12, color: textMuted),
                         ),
                       ],
                     ),
@@ -277,6 +277,7 @@ void showIbanSheet(BuildContext context, AppState appState) {
 void showUploadReceiptSheet(
   BuildContext context,
   AppState appState, {
+  PortalRepository? repository,
   PromissoryNote? preselectedNote,
 }) {
   final unpaidNotes = appState.customerNotes
@@ -293,14 +294,17 @@ void showUploadReceiptSheet(
     return;
   }
 
-  PromissoryNote selectedNote = preselectedNote != null &&
+  PromissoryNote selectedNote =
+      preselectedNote != null &&
           unpaidNotes.any((n) => n.id == preselectedNote.id)
       ? unpaidNotes.firstWhere((n) => n.id == preselectedNote.id)
       : unpaidNotes.first;
 
   String selectedBank = 'HAVALE / EFT (Ziraat Bankası)';
-  String selectedFileName =
-      'dekont_${selectedNote.senetNo.toLowerCase().replaceAll('-', '_')}.pdf';
+  String selectedFileName = repository == null
+      ? 'dekont_${selectedNote.senetNo.toLowerCase().replaceAll('-', '_')}.pdf'
+      : 'Dosya seçilmedi';
+  Uint8List? selectedFileBytes;
   final noteController = TextEditingController();
 
   final bankOptions = [
@@ -309,13 +313,6 @@ void showUploadReceiptSheet(
     'HAVALE / EFT (Türkiye İş Bankası)',
     'Kredi Kartı / Sanal POS Makbuzu',
     'Şirket veznesine elden ödeme makbuzu',
-  ];
-
-  final sampleFiles = [
-    'mobil_bankacilik_dekont.pdf',
-    'fast_transfer_makbuzu.jpg',
-    'eft_onay_belgesi_2026.pdf',
-    'vezne_tahsilat_fisi.png',
   ];
 
   showGlassBottomSheet(
@@ -555,7 +552,9 @@ void showUploadReceiptSheet(
                                   ),
                                 ),
                                 Text(
-                                  'Dekont belgesi eklemeye hazır (245 KB)',
+                                  selectedFileBytes == null
+                                      ? 'PDF veya görsel seçin (en fazla 10 MB)'
+                                      : '${(selectedFileBytes!.length / 1024).toStringAsFixed(0)} KB • yüklemeye hazır',
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: textMuted,
@@ -572,13 +571,51 @@ void showUploadReceiptSheet(
                               horizontal: 11,
                               vertical: 7,
                             ),
-                            onTap: () {
-                              final nextIdx =
-                                  (sampleFiles.indexOf(selectedFileName) + 1) %
-                                      sampleFiles.length;
-                              setModalState(() {
-                                selectedFileName = sampleFiles[nextIdx];
-                              });
+                            onTap: () async {
+                              if (repository == null) {
+                                setModalState(() {
+                                  selectedFileName =
+                                      'dekont_${DateTime.now().millisecondsSinceEpoch}.pdf';
+                                });
+                                return;
+                              }
+                              try {
+                                final files = await FilePicker.pickFiles(
+                                  type: FileType.custom,
+                                  allowedExtensions: const [
+                                    'pdf',
+                                    'jpg',
+                                    'jpeg',
+                                    'png',
+                                  ],
+                                );
+                                if (files.isEmpty || !context.mounted) return;
+                                final file = files.first;
+                                final bytes = await file.readAsBytes();
+                                if (!context.mounted) return;
+                                if (bytes.length > 10 * 1024 * 1024) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Dosya boyutu 10 MB sınırını aşıyor.',
+                                      ),
+                                    ),
+                                  );
+                                  return;
+                                }
+                                setModalState(() {
+                                  selectedFileName = file.name;
+                                  selectedFileBytes = bytes;
+                                });
+                              } catch (error) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Dosya açılamadı: $error'),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                           ),
                         ],
@@ -597,16 +634,12 @@ void showUploadReceiptSheet(
                     CupertinoTextField(
                       controller: noteController,
                       maxLines: 2,
-                      placeholder:
-                          'Örn: Eşimin hesabından gönderildi, açıklama kısmına senet no yazıldı...',
+                      placeholder: 'Örn: Eşimin hesabından gönderildi, açıklama kısmına senet no yazıldı...',
                       placeholderStyle: TextStyle(
                         color: textMuted,
                         fontSize: 13,
                       ),
-                      style: TextStyle(
-                        color: textPrimary,
-                        fontSize: 13.5,
-                      ),
+                      style: TextStyle(color: textPrimary, fontSize: 13.5),
                       padding: const EdgeInsets.all(13),
                       decoration: BoxDecoration(
                         color: AppGlass.subtleSurface(context),
@@ -625,15 +658,76 @@ void showUploadReceiptSheet(
                         label:
                             '${formatCurrency(selectedNote.amount)} Ödeme Bildirimini Gönder',
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        onTap: () {
-                          appState.submitPaymentReceipt(
-                            noteId: selectedNote.id,
-                            receiptFileName: selectedFileName,
-                            paymentMethod: selectedBank,
-                            receiptNote: noteController.text.trim().isEmpty
-                                ? '$selectedBank üzerinden ödeme yapıldı.'
-                                : noteController.text.trim(),
-                          );
+                        onTap: () async {
+                          final customerNote =
+                              noteController.text.trim().isEmpty
+                              ? '$selectedBank üzerinden ödeme yapıldı.'
+                              : noteController.text.trim();
+                          if (repository == null) {
+                            appState.submitPaymentReceipt(
+                              noteId: selectedNote.id,
+                              receiptFileName: selectedFileName,
+                              paymentMethod: selectedBank,
+                              receiptNote: customerNote,
+                            );
+                          } else {
+                            final bytes = selectedFileBytes;
+                            if (bytes == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Ödeme bildirimini göndermeden önce dekont seçin.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            String? uploadedPath;
+                            try {
+                              final extension = selectedFileName
+                                  .split('.')
+                                  .last
+                                  .toLowerCase();
+                              final contentType = switch (extension) {
+                                'pdf' => 'application/pdf',
+                                'png' => 'image/png',
+                                _ => 'image/jpeg',
+                              };
+                              uploadedPath = await repository
+                                  .uploadPaymentReceipt(
+                                    customerId: appState.currentCustomer.id,
+                                    fileName: selectedFileName,
+                                    bytes: bytes,
+                                    contentType: contentType,
+                                  );
+                              await repository.submitPaymentReceipt(
+                                noteId: selectedNote.id,
+                                customerId: appState.currentCustomer.id,
+                                receiptObjectPath: uploadedPath,
+                                paymentMethod: selectedBank,
+                                customerNote: customerNote,
+                              );
+                            } catch (error) {
+                              if (uploadedPath != null) {
+                                try {
+                                  await repository.deletePaymentReceipt(
+                                    uploadedPath,
+                                  );
+                                } catch (_) {}
+                              }
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Dekont gönderilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+                          }
+                          if (!ctx.mounted || !context.mounted) return;
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -713,10 +807,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                         ),
                         Text(
                           'Sözleşme No: ${customer.contractNo} • Tarih: 05.11.2026',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textMuted,
-                          ),
+                          style: TextStyle(fontSize: 12, color: textMuted),
                         ),
                       ],
                     ),
@@ -770,10 +861,7 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                           'Sözleşme Kodu:',
                           customer.contractNo,
                         ),
-                        Divider(
-                          height: 20,
-                          color: AppGlass.dividerColor(ctx),
-                        ),
+                        Divider(height: 20, color: AppGlass.dividerColor(ctx)),
                         Row(
                           children: [
                             Expanded(
@@ -925,18 +1013,22 @@ void showAccountStatementDialog(BuildContext context, AppState appState) {
                         buffer.writeln('Müşteri: ${customer.name}');
                         buffer.writeln('Sözleşme No: ${customer.contractNo}');
                         buffer.writeln(
-                            'Toplam: ${formatCurrency(total)} | Ödenen: ${formatCurrency(paid)} | Kalan: ${formatCurrency(remaining)}');
+                          'Toplam: ${formatCurrency(total)} | Ödenen: ${formatCurrency(paid)} | Kalan: ${formatCurrency(remaining)}',
+                        );
                         buffer.writeln('------------------------------------');
                         for (final n in notes) {
                           buffer.writeln(
-                              '${n.senetNo} | Vade: ${formatShortDate(n.dueDate)} | ${formatCurrency(n.amount)} | ${n.status.label}');
+                            '${n.senetNo} | Vade: ${formatShortDate(n.dueDate)} | ${formatCurrency(n.amount)} | ${n.status.label}',
+                          );
                         }
                         Clipboard.setData(
-                            ClipboardData(text: buffer.toString()));
+                          ClipboardData(text: buffer.toString()),
+                        );
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content:
-                                Text('Hesap ekstresi metin olarak kopyalandı!'),
+                            content: Text(
+                              'Hesap ekstresi metin olarak kopyalandı!',
+                            ),
                             behavior: SnackBarBehavior.floating,
                           ),
                         );
@@ -1014,10 +1106,7 @@ Widget _buildStatMini(
     children: [
       Text(
         title,
-        style: TextStyle(
-          fontSize: 11,
-          color: AppGlass.textMuted(context),
-        ),
+        style: TextStyle(fontSize: 11, color: AppGlass.textMuted(context)),
       ),
       const SizedBox(height: 2),
       Text(
@@ -1032,8 +1121,27 @@ Widget _buildStatMini(
   );
 }
 
-void showNotificationsSheet(BuildContext context, AppState appState) {
-  appState.markAllNotificationsRead();
+Future<void> showNotificationsSheet(
+  BuildContext context,
+  AppState appState, {
+  PortalRepository? repository,
+}) async {
+  if (repository != null) {
+    try {
+      appState.replaceCustomerNotifications(
+        await repository.loadMyNotifications(),
+      );
+      await repository.markAllMyNotificationsRead();
+      appState.replaceCustomerNotifications(
+        await repository.loadMyNotifications(),
+      );
+    } catch (error) {
+      debugPrint('Could not refresh inbox: $error');
+    }
+  } else {
+    appState.markAllNotificationsRead();
+  }
+  if (!context.mounted) return;
   showGlassBottomSheet(
     context: context,
     builder: (ctx) {
@@ -1062,10 +1170,7 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  Icon(
-                    CupertinoIcons.bell_fill,
-                    color: textPrimary,
-                  ),
+                  Icon(CupertinoIcons.bell_fill, color: textPrimary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
@@ -1104,10 +1209,8 @@ void showNotificationsSheet(BuildContext context, AppState appState) {
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: list.length,
-                    separatorBuilder: (_, _) => Divider(
-                      height: 16,
-                      color: AppGlass.dividerColor(ctx),
-                    ),
+                    separatorBuilder: (_, _) =>
+                        Divider(height: 16, color: AppGlass.dividerColor(ctx)),
                     itemBuilder: (context, index) {
                       final item = list[index];
                       IconData icon = CupertinoIcons.bell_fill;

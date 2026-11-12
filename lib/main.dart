@@ -1,17 +1,35 @@
 import 'dart:ui';
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import 'services/backend_config.dart';
+import 'services/portal_repository.dart';
+import 'services/push_notification_service.dart';
+import 'services/auth_repository.dart';
 import 'models/app_models.dart';
 import 'services/app_state.dart';
+import 'screens/auth/auth_screen.dart';
 import 'screens/customer/customer_home_screen.dart';
 import 'screens/customer/customer_notes_screen.dart';
+import 'screens/customer/customer_project_screen.dart';
 import 'screens/customer/customer_support_screen.dart';
-import 'screens/customer/customer_website_screen.dart';
 import 'screens/customer/iban_and_statement_sheets.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
 import 'widgets/website_blurred_background.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService.initializeFirebase();
+  final backendConfig = BackendConfig.fromEnvironment();
+  if (backendConfig.isConfigured) {
+    await Supabase.initialize(
+      url: backendConfig.url!,
+      publishableKey: backendConfig.publishableKey!,
+    );
+  }
   runApp(const SenetTakipApp());
 }
 
@@ -23,8 +41,80 @@ class SenetTakipApp extends StatefulWidget {
 }
 
 class _SenetTakipAppState extends State<SenetTakipApp> {
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final AppState _appState = AppState();
   static const String _fontFamily = 'Plus Jakarta Sans';
+  bool _isAuthenticated = false;
+  bool _startupComplete = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restorePersistedSession());
+  }
+
+  Future<void> _restorePersistedSession() async {
+    final minSplash = Future<void>.delayed(const Duration(milliseconds: 1100));
+    final config = BackendConfig.fromEnvironment();
+    final user = config.isConfigured
+        ? Supabase.instance.client.auth.currentUser
+        : null;
+    if (user != null) {
+      try {
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('role, staff_role')
+            .eq('id', user.id)
+            .maybeSingle()
+            .timeout(const Duration(seconds: 8));
+        final dbRole = profile?['role'] as String?;
+        final role = switch (profile?['staff_role'] as String?) {
+          'sales_advisor' => UserRole.salesAdvisor,
+          'accounting' => UserRole.accounting,
+          'management' => UserRole.management,
+          _ when dbRole == 'admin' => UserRole.admin,
+          _ when dbRole == 'customer' => UserRole.customer,
+          _ => null,
+        };
+        if (role != null) {
+          _appState.setRole(role);
+          _isAuthenticated = true;
+        }
+      } catch (error) {
+        debugPrint('Could not restore the saved session profile: $error');
+      }
+    }
+    await minSplash;
+    if (mounted) setState(() => _startupComplete = true);
+  }
+
+  void _onAuthenticated(UserRole role) {
+    _appState.clearSessionData();
+    _appState.setRole(role);
+    setState(() => _isAuthenticated = true);
+  }
+
+  Future<void> _signOut() async {
+    try {
+      if (BackendConfig.fromEnvironment().isConfigured &&
+          Supabase.instance.client.auth.currentSession != null) {
+        try {
+          await PushNotificationService(Supabase.instance.client)
+              .unregisterCurrentToken();
+        } catch (error) {
+          debugPrint('Could not unregister push device: $error');
+        }
+        await Supabase.instance.client.auth.signOut();
+      }
+    } catch (error) {
+      debugPrint('Sign out failed remotely; clearing local session: $error');
+    } finally {
+      _appState.clearSessionData();
+      _appState.setRole(UserRole.customer);
+      _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      if (mounted) setState(() => _isAuthenticated = false);
+    }
+  }
 
   ThemeData _buildTheme(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
@@ -70,10 +160,12 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
       animation: _appState,
       builder: (context, _) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           title: 'Demirtürk Mobil',
           debugShowCheckedModeBanner: false,
-          scrollBehavior:
-              const MaterialScrollBehavior().copyWith(scrollbars: false),
+          scrollBehavior: const MaterialScrollBehavior().copyWith(
+            scrollbars: false,
+          ),
           themeMode: _appState.themeMode,
           theme: _buildTheme(Brightness.light),
           darkTheme: _buildTheme(Brightness.dark),
@@ -91,8 +183,10 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   if (constraints.maxWidth > 540) {
-                    final phoneHeight =
-                        (constraints.maxHeight - 32).clamp(400.0, 1200.0);
+                    final phoneHeight = (constraints.maxHeight - 32).clamp(
+                      400.0,
+                      1200.0,
+                    );
                     final mq = MediaQuery.of(context);
                     return Center(
                       child: Padding(
@@ -108,15 +202,16 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
                             border: Border.all(
                               color: isDark
                                   ? const Color(0xFFFFF8F0)
-                                      .withValues(alpha: 0.09)
+                                        .withValues(alpha: 0.09)
                                   : const Color(0xFF0F172A)
-                                      .withValues(alpha: 0.06),
+                                        .withValues(alpha: 0.06),
                               width: 0.8,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black
-                                    .withValues(alpha: isDark ? 0.50 : 0.06),
+                                color: Colors.black.withValues(
+                                  alpha: isDark ? 0.50 : 0.06,
+                                ),
                                 blurRadius: 32,
                                 offset: const Offset(0, 14),
                               ),
@@ -124,9 +219,7 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
                           ),
                           clipBehavior: Clip.antiAlias,
                           child: MediaQuery(
-                            data: mq.copyWith(
-                              size: Size(440, phoneHeight),
-                            ),
+                            data: mq.copyWith(size: Size(440, phoneHeight)),
                             child: navContent,
                           ),
                         ),
@@ -138,17 +231,113 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
               ),
             );
           },
-          home: MainShell(appState: _appState),
+          home: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 640),
+            reverseDuration: const Duration(milliseconds: 520),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            layoutBuilder: (currentChild, previousChildren) => Stack(
+              fit: StackFit.expand,
+              children: [...previousChildren, ?currentChild],
+            ),
+            transitionBuilder: (child, animation) {
+              final enteringPortal = child.key == const ValueKey('portal');
+              final slide =
+                  Tween<Offset>(
+                    begin: Offset(0, enteringPortal ? 0.055 : -0.04),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  );
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(position: slide, child: child),
+              );
+            },
+            child: !_startupComplete
+                ? const _StartupBrandScreen(key: ValueKey('startup-brand'))
+                : _isAuthenticated
+                ? KeyedSubtree(
+                    key: const ValueKey('portal'),
+                    child: MainShell(appState: _appState, onLogout: _signOut),
+                  )
+                : KeyedSubtree(
+                    key: const ValueKey('auth'),
+                    child: AuthScreen(
+                      appState: _appState,
+                      onAuthenticated: _onAuthenticated,
+                    ),
+                  ),
+          ),
         );
       },
     );
   }
 }
 
+class _StartupBrandScreen extends StatefulWidget {
+  const _StartupBrandScreen({super.key});
+
+  @override
+  State<_StartupBrandScreen> createState() => _StartupBrandScreenState();
+}
+
+class _StartupBrandScreenState extends State<_StartupBrandScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 850),
+  )..forward();
+  late final Animation<double> _opacity = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeOutCubic,
+  );
+  late final Animation<double> _scale = Tween<double>(
+    begin: .84,
+    end: 1,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Scaffold(
+      backgroundColor: isDark
+          ? const Color(0xFF141312)
+          : const Color(0xFFF8F9FB),
+      body: Center(
+        child: FadeTransition(
+          opacity: _opacity,
+          child: ScaleTransition(
+            scale: _scale,
+            child: Image.asset(
+              isDark
+                  ? 'assets/images/demirturk-emblem-white.png'
+                  : 'assets/images/demirturk-emblem-dark.png',
+              width: 116,
+              height: 116,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class MainShell extends StatefulWidget {
   final AppState appState;
+  final Future<void> Function() onLogout;
 
-  const MainShell({super.key, required this.appState});
+  const MainShell({super.key, required this.appState, required this.onLogout});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -158,6 +347,305 @@ class _MainShellState extends State<MainShell> {
   int _customerTabIndex = 0;
   int _adminTabIndex = 0;
   bool _isThemeMenuOpen = false;
+  PortalRepository? _portalRepository;
+  PushNotificationService? _pushService;
+  StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _notesSubscription;
+  StreamSubscription<List<Map<String, dynamic>>>? _customersSubscription;
+  bool _backendDataReady = false;
+  bool _customerContractPending = false;
+  Object? _backendDataError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (BackendConfig.fromEnvironment().isConfigured &&
+        Supabase.instance.client.auth.currentUser != null) {
+      _portalRepository = PortalRepository(Supabase.instance.client);
+      _pushService = PushNotificationService(Supabase.instance.client);
+      _notificationSubscription = _portalRepository!
+          .watchMyNotifications()
+          .listen(
+            widget.appState.replaceCustomerNotifications,
+            onError: (Object error) =>
+                debugPrint('Inbox realtime error: $error'),
+          );
+      unawaited(
+        _pushService!.start(
+          onMessage: (payload) {
+            unawaited(_refreshNotifications());
+            if (mounted && payload.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Yeni bir bildiriminiz var')),
+              );
+            }
+          },
+        ),
+      );
+      unawaited(_refreshNotifications());
+      unawaited(_loadUserPreferences());
+      unawaited(_loadPortalData());
+      _notesSubscription = _portalRepository!.watchNotes().listen(
+        (_) => unawaited(_refreshPortalNotes()),
+        onError: (Object error) => debugPrint('Notes realtime error: $error'),
+      );
+      if (widget.appState.currentRole.isStaff) {
+        _customersSubscription = _portalRepository!.watchCustomers().listen(
+          (_) => unawaited(_refreshCustomers()),
+          onError: (Object error) =>
+              debugPrint('Customers realtime error: $error'),
+        );
+      }
+    } else {
+      // The staff registration preview does not create a backend session.
+      // Mark it ready so the shell can show the staff workspace instead of
+      // leaving the user on an endless spinner.
+      _backendDataReady = true;
+    }
+  }
+
+  Future<void> _refreshNotifications() async {
+    final repository = _portalRepository;
+    if (repository == null) return;
+    try {
+      widget.appState.replaceCustomerNotifications(
+        await repository.loadMyNotifications(),
+      );
+    } catch (error) {
+      debugPrint('Inbox refresh failed: $error');
+    }
+  }
+
+  Future<void> _refreshPortalNotes() async {
+    final repository = _portalRepository;
+    if (repository == null) return;
+    try {
+      final notes = widget.appState.currentRole.canSeePromissoryNotes
+          ? await repository.loadNotes()
+          : await repository.loadMyNotes();
+      widget.appState.replaceBackendNotes(notes);
+    } catch (error) {
+      debugPrint('Notes refresh failed: $error');
+    }
+  }
+
+  Future<void> _refreshCustomers() async {
+    final repository = _portalRepository;
+    if (repository == null || !widget.appState.currentRole.isStaff) return;
+    try {
+      widget.appState.replaceBackendCustomers(await repository.loadCustomers());
+    } catch (error) {
+      debugPrint('Customers refresh failed: $error');
+    }
+  }
+
+  Future<void> _loadPortalData() async {
+    final repository = _portalRepository;
+    if (repository == null) return;
+    if (mounted) setState(() => _backendDataReady = false);
+    try {
+      final banks = await repository.loadBankAccounts().timeout(
+        const Duration(seconds: 20),
+      );
+      if (widget.appState.currentRole.isStaff) {
+        final results = await Future.wait([
+          repository.loadCustomers().timeout(const Duration(seconds: 20)),
+          if (widget.appState.currentRole.canSeePromissoryNotes)
+            repository.loadNotes().timeout(const Duration(seconds: 20))
+          else
+            Future.value(<Map<String, dynamic>>[]),
+        ]);
+        widget.appState.replaceBackendAdminData(
+          customerRows: results[0],
+          noteRows: results[1],
+          bankRows: banks,
+        );
+      } else {
+        var customer = await repository.loadMyCustomer();
+        if (customer == null) {
+          final profile = await repository.loadMyProfile();
+          await repository.ensureMyCustomerRecord(
+            fullName: profile?['full_name']?.toString() ?? '',
+          );
+          customer = await repository.loadMyCustomer();
+        }
+        if (customer == null) {
+          final profile = await repository.loadMyProfile();
+          widget.appState.replaceBackendPendingCustomer(
+            name: profile?['full_name']?.toString() ?? 'Müşteri',
+            phone: Supabase.instance.client.auth.currentUser?.phone ?? '',
+            bankRows: banks,
+          );
+          if (mounted) {
+            setState(() {
+              _backendDataReady = true;
+              _backendDataError = null;
+              _customerContractPending = true;
+            });
+          }
+          return;
+        }
+        _customerContractPending = customer['contract_status'] == 'pending';
+        final notes = await repository.loadMyNotes();
+        widget.appState.replaceBackendCustomerData(
+          customerRow: customer,
+          noteRows: notes,
+          bankRows: banks,
+        );
+      }
+      if (mounted) {
+        setState(() {
+          _backendDataReady = true;
+          _backendDataError = null;
+        });
+      }
+    } catch (error) {
+      debugPrint('Portal data load failed: $error');
+      if (mounted) {
+        setState(() {
+          _backendDataReady = true;
+          _backendDataError = error;
+        });
+      }
+    }
+  }
+
+  void _showAiComingSoon() {
+    showCupertinoDialog<void>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('Demirtürk AI'),
+        content: const Padding(
+          padding: EdgeInsets.only(top: 8),
+          child: Text('Yakında!'),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Tamam'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showStaffProfile() {
+    final profileFuture = _portalRepository?.loadMyProfile();
+    Navigator.of(context).push(
+      CupertinoPageRoute<void>(
+        builder: (_) => _StaffProfilePage(
+          profileFuture: profileFuture,
+          role: widget.appState.currentRole,
+          localStaffName: widget.appState.localStaffName,
+          onLogout: widget.onLogout,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _loadUserPreferences() async {
+    final repository = _portalRepository;
+    if (repository == null) return;
+    try {
+      final preferences = await repository.loadUserPreferences();
+      final mode = switch (preferences['theme_mode']) {
+        'light' => ThemeMode.light,
+        'dark' => ThemeMode.dark,
+        _ => ThemeMode.system,
+      };
+      if (mounted) widget.appState.setThemeMode(mode);
+    } catch (error) {
+      debugPrint('Settings load failed: $error');
+    }
+  }
+
+  Future<void> _changePassword() async {
+    final repository = _portalRepository;
+    if (repository == null) return;
+    final auth = AuthRepository(Supabase.instance.client);
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    final values = await showCupertinoDialog<(String, String)?>(
+      context: context,
+      builder: (dialogContext) => CupertinoAlertDialog(
+        title: const Text('Yeni parola'),
+        content: Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CupertinoTextField(
+                controller: passwordController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 6,
+                placeholder: '6 haneli parola',
+              ),
+              const SizedBox(height: 8),
+              CupertinoTextField(
+                controller: confirmController,
+                keyboardType: TextInputType.number,
+                obscureText: true,
+                maxLength: 6,
+                placeholder: 'Parola tekrarı',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Vazgeç'),
+          ),
+          CupertinoDialogAction(
+            onPressed: () => Navigator.pop(dialogContext, (
+              passwordController.text,
+              confirmController.text,
+            )),
+            child: const Text('Güncelle'),
+          ),
+        ],
+      ),
+    );
+    passwordController.dispose();
+    confirmController.dispose();
+    if (values == null) return;
+    if (!mounted) return;
+    if (!RegExp(r'^\d{6}$').hasMatch(values.$1) || values.$1 != values.$2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Parolalar aynı ve 6 rakamdan oluşmalı.')),
+      );
+      return;
+    }
+    try {
+      // No reauthentication OTP is requested in this release.
+      await auth.updatePassword(values.$1);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Parolanız güncellendi.')));
+      }
+    } on AuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.message)));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Parola değiştirilemedi: $error')),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_notificationSubscription?.cancel());
+    unawaited(_notesSubscription?.cancel());
+    unawaited(_customersSubscription?.cancel());
+    super.dispose();
+  }
 
   void _switchCustomerTab(int newIndex) {
     if (newIndex == _customerTabIndex) return;
@@ -252,7 +740,7 @@ class _MainShellState extends State<MainShell> {
                   ),
                 ),
 
-                // Üst Bar İçeriği: Katmansız Logo + DEMİRTÜRK / MOBİL + Sağda Bildirimler
+                // Üst Bar İçeriği: Katmansız Logo + DEMİRTÜRK / MOBİL + AI ve Bildirimler
                 Padding(
                   padding: EdgeInsets.only(
                     top: topStatusBarSpacing,
@@ -306,13 +794,49 @@ class _MainShellState extends State<MainShell> {
                           ),
                         ),
 
-                        // Sağ üstte yalnızca Bildirimler
                         CupertinoButton(
                           padding: EdgeInsets.zero,
                           minimumSize: Size.zero,
                           pressedOpacity: 0.65,
-                          onPressed: () =>
-                              showNotificationsSheet(context, widget.appState),
+                          onPressed: _showAiComingSoon,
+                          child: SizedBox(
+                            width: 32,
+                            height: 32,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              alignment: Alignment.center,
+                              children: [
+                                Image.asset(
+                                  isDark
+                                      ? 'assets/images/demirturk-emblem-white.png'
+                                      : 'assets/images/demirturk-emblem-dark.png',
+                                  width: 20,
+                                  height: 18,
+                                  fit: BoxFit.contain,
+                                ),
+                                Positioned(
+                                  top: 0,
+                                  right: 1,
+                                  child: Icon(
+                                    CupertinoIcons.sparkles,
+                                    size: 11,
+                                    color: const Color(0xFFE11D48),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        CupertinoButton(
+                          padding: EdgeInsets.zero,
+                          minimumSize: Size.zero,
+                          pressedOpacity: 0.65,
+                          onPressed: () => showNotificationsSheet(
+                            context,
+                            widget.appState,
+                            repository: _portalRepository,
+                          ),
                           child: Container(
                             width: 32,
                             height: 32,
@@ -345,6 +869,28 @@ class _MainShellState extends State<MainShell> {
                             ),
                           ),
                         ),
+                        if (!isCustomer) ...[
+                          const SizedBox(width: 8),
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            pressedOpacity: 0.65,
+                            onPressed: _showStaffProfile,
+                            child: Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: AppGlass.subtleSurface(context),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                CupertinoIcons.person_crop_circle_fill,
+                                size: 19,
+                                color: AppGlass.textPrimary(context),
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -352,12 +898,42 @@ class _MainShellState extends State<MainShell> {
               ],
             ),
           ),
-          body: isCustomer
-              ? _buildCustomerBody(
-                  bottomNavHeight:
-                      58 + (bottomNavSafeSpacing * 0.42).clamp(8.0, 16.0),
+          body:
+              BackendConfig.fromEnvironment().isConfigured && !_backendDataReady
+              ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+              : _backendDataError != null && isCustomer
+              ? _BackendLoadError(
+                  error: _backendDataError!,
+                  onRetry: _loadPortalData,
                 )
-              : _buildAdminBody(),
+              : AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 500),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: _buildScreenTransition,
+                  child: isCustomer
+                      ? KeyedSubtree(
+                          key: const ValueKey('customer-workspace'),
+                          child: _buildCustomerBody(
+                            bottomNavHeight:
+                                58 +
+                                (bottomNavSafeSpacing * 0.42).clamp(8.0, 16.0),
+                          ),
+                        )
+                      : KeyedSubtree(
+                          key: const ValueKey('admin-workspace'),
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 440),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: _buildScreenTransition,
+                            child: KeyedSubtree(
+                              key: ValueKey<int>(_adminTabIndex),
+                              child: _buildAdminBody(),
+                            ),
+                          ),
+                        ),
+                ),
           bottomNavigationBar: _buildBottomTabBar(
             context: context,
             isCustomer: isCustomer,
@@ -368,6 +944,17 @@ class _MainShellState extends State<MainShell> {
 
         return mobileContent;
       },
+    );
+  }
+
+  Widget _buildScreenTransition(Widget child, Animation<double> animation) {
+    final position = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+    return FadeTransition(
+      opacity: animation,
+      child: SlideTransition(position: position, child: child),
     );
   }
 
@@ -397,16 +984,38 @@ class _MainShellState extends State<MainShell> {
               activeIcon: CupertinoIcons.chat_bubble_2_fill,
               label: 'İletişim',
             ),
-            _IosTabItem(
-              assetIcon: isDark
-                  ? 'assets/images/demirturk-emblem-white.png'
-                  : 'assets/images/demirturk-emblem-dark.png',
-              label: 'Resmi',
+            const _IosTabItem(
+              icon: CupertinoIcons.building_2_fill,
+              activeIcon: CupertinoIcons.building_2_fill,
+              label: 'Evim',
             ),
             const _IosTabItem(
               icon: CupertinoIcons.person_crop_circle,
               activeIcon: CupertinoIcons.person_crop_circle_fill,
               label: 'Hesabım',
+            ),
+          ]
+        : widget.appState.currentRole.isSalesAdvisor
+        ? const [
+            _IosTabItem(
+              icon: CupertinoIcons.person_2,
+              activeIcon: CupertinoIcons.person_2_fill,
+              label: 'Müşteriler',
+            ),
+            _IosTabItem(
+              icon: CupertinoIcons.building_2_fill,
+              activeIcon: CupertinoIcons.building_2_fill,
+              label: 'Süreçler',
+            ),
+            _IosTabItem(
+              icon: CupertinoIcons.bubble_left_bubble_right,
+              activeIcon: CupertinoIcons.bubble_left_bubble_right_fill,
+              label: 'Mesajlar',
+            ),
+            _IosTabItem(
+              icon: CupertinoIcons.archivebox,
+              activeIcon: CupertinoIcons.archivebox_fill,
+              label: 'Kapananlar',
             ),
           ]
         : [
@@ -430,6 +1039,11 @@ class _MainShellState extends State<MainShell> {
               icon: CupertinoIcons.bubble_left_bubble_right,
               activeIcon: CupertinoIcons.bubble_left_bubble_right_fill,
               label: 'Mesajlar',
+            ),
+            const _IosTabItem(
+              icon: CupertinoIcons.archivebox,
+              activeIcon: CupertinoIcons.archivebox_fill,
+              label: 'Kapananlar',
             ),
           ];
 
@@ -479,8 +1093,9 @@ class _MainShellState extends State<MainShell> {
                 children: List.generate(items.length, (idx) {
                   final item = items[idx];
                   final isSelected = idx == activeIndex;
-                  final activeFg =
-                      isDark ? const Color(0xFF121110) : Colors.white;
+                  final activeFg = isDark
+                      ? const Color(0xFF121110)
+                      : Colors.white;
                   final inactiveFg = isDark
                       ? const Color(0xFF9C958C)
                       : const Color(0xFF64748B);
@@ -504,24 +1119,11 @@ class _MainShellState extends State<MainShell> {
                             Stack(
                               clipBehavior: Clip.none,
                               children: [
-                                item.assetIcon != null
-                                    ? Image.asset(
-                                        item.assetIcon!,
-                                        width: 20,
-                                        height: 20,
-                                        fit: BoxFit.contain,
-                                        color:
-                                            isSelected ? activeFg : inactiveFg,
-                                        colorBlendMode: BlendMode.srcIn,
-                                      )
-                                    : Icon(
-                                        isSelected
-                                            ? item.activeIcon
-                                            : item.icon,
-                                        size: 20,
-                                        color:
-                                            isSelected ? activeFg : inactiveFg,
-                                      ),
+                                Icon(
+                                  isSelected ? item.activeIcon : item.icon,
+                                  size: 20,
+                                  color: isSelected ? activeFg : inactiveFg,
+                                ),
                                 if (item.badgeCount > 0)
                                   Positioned(
                                     right: -6,
@@ -573,24 +1175,29 @@ class _MainShellState extends State<MainShell> {
         page = CustomerHomeScreen(
           appState: widget.appState,
           onNavigateTab: _switchCustomerTab,
+          repository: _portalRepository,
         );
         break;
       case 1:
         // Ödemelerim
         page = CustomerNotesScreen(
           appState: widget.appState,
+          repository: _portalRepository,
         );
         break;
       case 2:
         // İletişim
         page = CustomerSupportScreen(
           appState: widget.appState,
+          repository: _portalRepository,
         );
         break;
       case 3:
-        // Resmi (iframe navbar'ın üstünü kapatmasın diye bottomPadding verilir)
-        page = CustomerWebsiteScreen(
+        // Evim: müşterinin proje ve bağımsız bölüm bilgileri.
+        page = CustomerProjectScreen(
+          appState: widget.appState,
           bottomPadding: bottomNavHeight,
+          repository: _portalRepository,
         );
         break;
       case 4:
@@ -601,30 +1208,31 @@ class _MainShellState extends State<MainShell> {
         page = CustomerHomeScreen(
           appState: widget.appState,
           onNavigateTab: _switchCustomerTab,
+          repository: _portalRepository,
         );
         break;
     }
 
+    final content = _customerContractPending
+        ? Column(
+            children: [
+              _buildPendingContractBanner(),
+              Expanded(child: page),
+            ],
+          )
+        : page;
+
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
+      duration: const Duration(milliseconds: 460),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       layoutBuilder: (currentChild, previousChildren) {
         return Stack(
           fit: StackFit.expand,
-          children: <Widget>[
-            ...previousChildren,
-            ?currentChild,
-          ],
+          children: <Widget>[...previousChildren, ?currentChild],
         );
       },
       transitionBuilder: (child, animation) {
-        if (child.key == const ValueKey<int>(3)) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        }
         final isIncoming = child.key == ValueKey<int>(_customerTabIndex);
         // Yeni sayfa aşağıdan yukarıya (bottom-to-top) kayarak gelir
         final beginOffset = isIncoming
@@ -636,23 +1244,58 @@ class _MainShellState extends State<MainShell> {
             begin: beginOffset,
             end: Offset.zero,
           ).animate(animation),
-          child: FadeTransition(
-            opacity: animation,
-            child: child,
-          ),
+          child: FadeTransition(opacity: animation, child: child),
         );
       },
       child: KeyedSubtree(
         key: ValueKey<int>(_customerTabIndex),
-        child: page,
+        child: content,
       ),
     );
   }
 
+  Widget _buildPendingContractBanner() => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    decoration: BoxDecoration(
+      color: const Color(0xFFFF9F0A).withValues(alpha: .12),
+      border: Border.all(color: const Color(0xFFFF9F0A).withValues(alpha: .32)),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: const Row(
+      children: [
+        Icon(
+          CupertinoIcons.doc_text_search,
+          color: Color(0xFFFF9F0A),
+          size: 17,
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            'Sözleşmeniz onay bekliyor. Onaylandığında sözleşme ve senet bilgileriniz görünür.',
+            style: TextStyle(
+              color: Color(0xFFFFD08A),
+              fontSize: 11.5,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+
   Widget _buildAdminBody() {
+    final closedIndex = widget.appState.currentRole.isSalesAdvisor ? 3 : 4;
+    if (_adminTabIndex == closedIndex && _portalRepository == null) {
+      return const Center(
+        child: Text('Kapanan sohbet arşivi için sunucu bağlantısı gerekli.'),
+      );
+    }
     return AdminDashboardScreen(
       appState: widget.appState,
       activeTabIndex: _adminTabIndex,
+      repository: _portalRepository,
     );
   }
 
@@ -683,21 +1326,9 @@ class _MainShellState extends State<MainShell> {
     }
 
     final options = <(ThemeMode, String, IconData)>[
-      (
-        ThemeMode.system,
-        'Sistem',
-        CupertinoIcons.device_phone_portrait,
-      ),
-      (
-        ThemeMode.light,
-        'Aydınlık',
-        CupertinoIcons.sun_max_fill,
-      ),
-      (
-        ThemeMode.dark,
-        'Koyu',
-        CupertinoIcons.moon_stars_fill,
-      ),
+      (ThemeMode.system, 'Sistem', CupertinoIcons.device_phone_portrait),
+      (ThemeMode.light, 'Aydınlık', CupertinoIcons.sun_max_fill),
+      (ThemeMode.dark, 'Koyu', CupertinoIcons.moon_stars_fill),
     ];
 
     return ListView(
@@ -859,13 +1490,20 @@ class _MainShellState extends State<MainShell> {
                         final activeBg = isDark
                             ? const Color(0xFFF5F3F0)
                             : const Color(0xFF1E293B);
-                        final activeFg =
-                            isDark ? const Color(0xFF121110) : Colors.white;
+                        final activeFg = isDark
+                            ? const Color(0xFF121110)
+                            : Colors.white;
 
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {
                             widget.appState.setThemeMode(mode);
+                            unawaited(
+                              _portalRepository?.saveUserPreferences({
+                                    'theme_mode': mode.name,
+                                  }) ??
+                                  Future<void>.value(),
+                            );
                             setState(() {
                               _isThemeMenuOpen = false;
                             });
@@ -878,8 +1516,7 @@ class _MainShellState extends State<MainShell> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color:
-                                  isSelected ? activeBg : Colors.transparent,
+                              color: isSelected ? activeBg : Colors.transparent,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Row(
@@ -927,7 +1564,82 @@ class _MainShellState extends State<MainShell> {
                 duration: const Duration(milliseconds: 220),
                 sizeCurve: Curves.easeOutCubic,
               ),
+              Divider(height: 20, color: AppGlass.dividerColor(context)),
+              CupertinoButton(
+                padding: EdgeInsets.zero,
+                onPressed: _portalRepository == null ? null : _changePassword,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.lock_rotation,
+                        size: 17,
+                        color: AppGlass.textPrimary(context),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Parolayı değiştir',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppGlass.textPrimary(context),
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      CupertinoIcons.chevron_right,
+                      size: 15,
+                      color: AppGlass.textMuted(context),
+                    ),
+                  ],
+                ),
+              ),
             ],
+          ),
+        ),
+        const SizedBox(height: 20),
+        Center(
+          child: CupertinoButton(
+            padding: EdgeInsets.zero,
+            onPressed: widget.onLogout,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: const Color(0xFFE11D48).withValues(alpha: 0.72),
+                  width: 1,
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    CupertinoIcons.square_arrow_left,
+                    size: 16,
+                    color: Color(0xFFE11D48),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    'Çıkış yap',
+                    style: TextStyle(
+                      color: Color(0xFFE11D48),
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ],
@@ -935,17 +1647,247 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
+class _StaffProfilePage extends StatelessWidget {
+  const _StaffProfilePage({
+    required this.profileFuture,
+    required this.role,
+    required this.localStaffName,
+    required this.onLogout,
+  });
+
+  final Future<Map<String, dynamic>?>? profileFuture;
+  final UserRole role;
+  final String? localStaffName;
+  final Future<void> Function() onLogout;
+
+  String get _roleLabel => switch (role) {
+    UserRole.salesAdvisor => 'Satış Danışmanı',
+    UserRole.accounting => 'Muhasebe',
+    UserRole.management || UserRole.admin => 'Yönetim',
+    UserRole.customer => 'Müşteri',
+  };
+
+  String get _idLabel => switch (role) {
+    UserRole.salesAdvisor => 'Danışman ID',
+    UserRole.accounting => 'Muhasebe ID',
+    UserRole.management || UserRole.admin => 'Yönetici ID',
+    UserRole.customer => 'Hesap ID',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final textColor = AppGlass.textPrimary(context);
+    final mutedColor = AppGlass.textSecondary(context);
+
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: CupertinoButton(
+          padding: EdgeInsets.zero,
+          onPressed: () => Navigator.of(context).maybePop(),
+          child: Icon(CupertinoIcons.back, color: textColor),
+        ),
+        title: Text(
+          'Profil',
+          style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
+        ),
+        centerTitle: true,
+      ),
+      body: SafeArea(
+        top: false,
+        child: FutureBuilder<Map<String, dynamic>?>(
+          future: profileFuture ?? Future<Map<String, dynamic>?>.value(),
+          builder: (context, snapshot) {
+            final profile = snapshot.data;
+            final currentUser = BackendConfig.fromEnvironment().isConfigured
+                ? Supabase.instance.client.auth.currentUser
+                : null;
+            final metadataName =
+                (currentUser?.userMetadata ??
+                const <String, dynamic>{})['full_name'];
+            final profileName = profile?['full_name']?.toString().trim();
+            final name = localStaffName?.isNotEmpty == true
+                ? localStaffName!
+                : profileName?.isNotEmpty == true
+                ? profileName!
+                : (metadataName?.toString().trim().isNotEmpty == true
+                      ? metadataName.toString().trim()
+                      : 'Ad soyad');
+            final staffId = profile?['staff_id']?.toString().trim();
+
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 82,
+                      height: 82,
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: AppGlass.dividerColor(context),
+                        ),
+                      ),
+                      child: Icon(
+                        CupertinoIcons.person_crop_circle_fill,
+                        size: 48,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: 21,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      _roleLabel,
+                      style: TextStyle(color: mutedColor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 24),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 15,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(context),
+                        borderRadius: BorderRadius.circular(17),
+                        border: Border.all(
+                          color: AppGlass.dividerColor(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _idLabel,
+                              style: TextStyle(
+                                color: mutedColor,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                          ),
+                          if (localStaffName?.isNotEmpty == true)
+                            Text(
+                              'Supabase hesabı gerekli',
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          else if (snapshot.connectionState ==
+                              ConnectionState.waiting)
+                            const CupertinoActivityIndicator()
+                          else
+                            Text(
+                              staffId?.isNotEmpty == true
+                                  ? staffId!
+                                  : 'ID bekleniyor',
+                              style: TextStyle(
+                                color: textColor,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+                    SizedBox(
+                      width: 220,
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        borderRadius: BorderRadius.circular(24),
+                        color: const Color(0xFFE11D48).withValues(alpha: .12),
+                        onPressed: () => unawaited(onLogout()),
+                        child: const Text(
+                          'Çıkış yap',
+                          style: TextStyle(
+                            color: Color(0xFFE11D48),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _BackendLoadError extends StatelessWidget {
+  const _BackendLoadError({required this.error, required this.onRetry});
+
+  final Object error;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Padding(
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            CupertinoIcons.exclamationmark_circle,
+            color: Color(0xFFE11D48),
+            size: 28,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Sunucu verileri yüklenemedi',
+            style: TextStyle(
+              color: AppGlass.textPrimary(context),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            error.toString(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: AppGlass.textSecondary(context),
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 14),
+          CupertinoButton.filled(
+            onPressed: onRetry,
+            child: const Text('Yeniden dene'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 class _IosTabItem {
   final IconData? icon;
   final IconData? activeIcon;
-  final String? assetIcon;
   final String label;
   final int badgeCount;
 
   const _IosTabItem({
     this.icon,
     this.activeIcon,
-    this.assetIcon,
     required this.label,
     this.badgeCount = 0,
   });

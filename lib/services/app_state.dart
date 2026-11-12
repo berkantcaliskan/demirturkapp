@@ -1,14 +1,42 @@
 import 'package:flutter/material.dart';
+
 import '../models/app_models.dart';
 
 class AppState extends ChangeNotifier {
   UserRole _currentRole = UserRole.customer;
-  String _selectedCustomerId = 'cust_1';
+  String _selectedCustomerId = '';
   ThemeMode _themeMode = ThemeMode.system;
+  bool _hasRemoteNotifications = false;
+  String? _localStaffName;
 
   UserRole get currentRole => _currentRole;
   String get selectedCustomerId => _selectedCustomerId;
   ThemeMode get themeMode => _themeMode;
+  String? get localStaffName => _localStaffName;
+
+  void setLocalStaffName(String value) {
+    _localStaffName = value.trim();
+    notifyListeners();
+  }
+
+  void clearLocalStaffName() {
+    if (_localStaffName == null) return;
+    _localStaffName = null;
+    notifyListeners();
+  }
+
+  void clearSessionData() {
+    _selectedCustomerId = '';
+    _hasRemoteNotifications = false;
+    _localStaffName = null;
+    _bankAccounts.clear();
+    _salesAdvisors.clear();
+    _customers.clear();
+    _notes.clear();
+    _tickets.clear();
+    _notifications.clear();
+    notifyListeners();
+  }
 
   bool isDark(BuildContext context) {
     if (_themeMode == ThemeMode.system) {
@@ -30,12 +58,40 @@ class AppState extends ChangeNotifier {
   }
 
   Customer get currentCustomer =>
-      _customers.firstWhere((c) => c.id == _selectedCustomerId);
+      _customers
+          .where((customer) => customer.id == _selectedCustomerId)
+          .firstOrNull ??
+      _emptyCustomer;
 
-  SalesAdvisor get currentSalesAdvisor => _salesAdvisors.firstWhere(
-        (a) => a.id == currentCustomer.assignedAdvisorId,
-        orElse: () => _salesAdvisors.first,
-      );
+  static const Customer _emptyCustomer = Customer(
+    id: '',
+    name: '',
+    tcOrTaxNo: '',
+    phone: '',
+    email: '',
+    address: '',
+    contractNo: '',
+    assignedAdvisorId: '',
+    contractStatus: 'pending',
+    projectName: '',
+    unitLabel: '',
+    projectStatus: '',
+  );
+
+  static final SalesAdvisor _unassignedAdvisor = SalesAdvisor(
+    id: '',
+    name: 'Henüz atanmadı',
+    roleTitle: 'Satış danışmanı',
+    phone: '',
+    photoUrl: '',
+    photoUpdatedAt: DateTime.fromMillisecondsSinceEpoch(0),
+  );
+
+  SalesAdvisor get currentSalesAdvisor =>
+      _salesAdvisors
+          .where((advisor) => advisor.id == currentCustomer.assignedAdvisorId)
+          .firstOrNull ??
+      _unassignedAdvisor;
 
   List<SalesAdvisor> get salesAdvisors => List.unmodifiable(_salesAdvisors);
   List<Customer> get customers => List.unmodifiable(_customers);
@@ -43,328 +99,285 @@ class AppState extends ChangeNotifier {
   List<BankAccount> get bankAccounts => List.unmodifiable(_bankAccounts);
   List<SupportTicket> get allTickets => List.unmodifiable(_tickets);
 
-  List<PromissoryNote> get customerNotes => _notes
-      .where((n) => n.customerId == _selectedCustomerId)
-      .toList()
-    ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+  List<PromissoryNote> get customerNotes =>
+      _notes.where((n) => n.customerId == _selectedCustomerId).toList()
+        ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
 
-  List<SupportTicket> get customerTickets => _tickets
-      .where(
-        (t) =>
-            t.customerId == _selectedCustomerId &&
-            !(t.isEndedByCustomer &&
-                t.channel != 'advisor' &&
-                t.channel != 'finance'),
-      )
-      .toList()
-    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  List<SupportTicket> get customerTickets =>
+      _tickets
+          .where(
+            (t) =>
+                t.customerId == _selectedCustomerId &&
+                !(t.isEndedByCustomer &&
+                    t.channel != 'advisor' &&
+                    t.channel != 'finance'),
+          )
+          .toList()
+        ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
 
-  List<AppNotification> get customerNotifications => _notifications
-      .where((n) => n.customerId == _selectedCustomerId)
-      .toList()
-    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+  List<AppNotification> get customerNotifications =>
+      _notifications
+          .where(
+            (n) =>
+                _hasRemoteNotifications || n.customerId == _selectedCustomerId,
+          )
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   int get unreadNotificationCount =>
       customerNotifications.where((n) => !n.isRead).length;
 
+  void replaceCustomerNotifications(List<Map<String, dynamic>> rows) {
+    final parsed = rows
+        .map(
+          (row) => AppNotification(
+            id: row['id'].toString(),
+            customerId: row['customer_id'].toString(),
+            title: row['title'] as String? ?? 'Bildirim',
+            body: row['body'] as String? ?? '',
+            createdAt:
+                DateTime.tryParse(row['created_at']?.toString() ?? '')
+                    ?.toLocal() ??
+                DateTime.now(),
+            isRead: row['is_read'] as bool? ?? false,
+            type: row['type'] as String? ?? 'general',
+          ),
+        )
+        .toList();
+    _hasRemoteNotifications = true;
+    _notifications
+      ..clear()
+      ..addAll(parsed);
+    notifyListeners();
+  }
+
   int get pendingVerificationCount =>
       _notes.where((n) => n.status == NoteStatus.verifying).length;
 
-  final List<BankAccount> _bankAccounts = const [
-    BankAccount(
-      bankName: 'Ziraat Bankası',
-      accountHolder: 'DEMİRTÜRK İNŞAAT & YAPI MALZ. SAN. TİC. LTD. ŞTİ.',
-      iban: 'TR33 0001 0017 4567 8910 1150 01',
-      branchName: 'Karasu Şubesi (1745)',
-      brandColor: Color(0xFFE11D48),
-    ),
-    BankAccount(
-      bankName: 'Garanti BBVA',
-      accountHolder: 'DEMİRTÜRK İNŞAAT & YAPI MALZ. SAN. TİC. LTD. ŞTİ.',
-      iban: 'TR76 0006 2000 4120 0006 2988 40',
-      branchName: 'Sakarya Ticari Şube (0412)',
-      brandColor: Color(0xFF059669),
-    ),
-    BankAccount(
-      bankName: 'Türkiye İş Bankası',
-      accountHolder: 'DEMİRTÜRK İNŞAAT & YAPI MALZ. SAN. TİC. LTD. ŞTİ.',
-      iban: 'TR19 0006 4000 0014 2300 8891 02',
-      branchName: 'Karasu Şubesi (4230)',
-      brandColor: Color(0xFF1D4ED8),
-    ),
-  ];
+  List<BankAccount> _bankAccounts = [];
 
-  final List<SalesAdvisor> _salesAdvisors = [
-    SalesAdvisor(
-      id: 'adv_1',
-      name: 'Ertuğrul Demirtürk',
-      roleTitle: 'Kıdemli Satış Danışmanı',
-      phone: '+90 543 667 34 54',
-      photoUrl:
-          'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=85',
-      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
-    ),
-    SalesAdvisor(
-      id: 'adv_2',
-      name: 'Elif Karahan',
-      roleTitle: 'Kurumsal Satış Danışmanı',
-      phone: '+90 543 667 34 54',
-      photoUrl:
-          'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=85',
-      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
-    ),
-    SalesAdvisor(
-      id: 'adv_3',
-      name: 'Burak Aydın',
-      roleTitle: 'Proje Satış Danışmanı',
-      phone: '+90 543 667 34 54',
-      photoUrl:
-          'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=800&q=85',
-      photoUpdatedAt: DateTime(2026, 11, 1, 9, 0),
-    ),
-  ];
+  final List<SalesAdvisor> _salesAdvisors = [];
 
-  final List<Customer> _customers = [
-    const Customer(
-      id: 'cust_1',
-      name: 'Ahmet Yılmaz',
-      tcOrTaxNo: '28491048216',
-      phone: '+90 532 418 72 90',
-      email: 'ahmet.yilmaz@eposta.com',
-      address: 'Yalı Mah. Yeni Şehir 3. Etap A Blok Daire 12 Karasu / Sakarya',
-      contractNo: 'DMR-2026-0148',
-      assignedAdvisorId: 'adv_1',
-    ),
-    const Customer(
-      id: 'cust_2',
-      name: 'Kaya Mimarlık & Yatırım Ltd. Şti.',
-      tcOrTaxNo: '5280419820',
-      phone: '+90 544 892 15 33',
-      email: 'muhasebe@kayayatirim.com.tr',
-      address: 'Aziziye Mah. Asel Doğa Evleri 2 B Blok Daire 4 Karasu / Sakarya',
-      contractNo: 'DMR-2026-0205',
-      assignedAdvisorId: 'adv_2',
-    ),
-    const Customer(
-      id: 'cust_3',
-      name: 'Zeynep Demir',
-      tcOrTaxNo: '49102837462',
-      phone: '+90 505 671 88 12',
-      email: 'zeynepdemir@eposta.com',
-      address: 'Yalı Mah. Plaj Cd. Almina Evleri 2 Daire 7 Karasu / Sakarya',
-      contractNo: 'DMR-2026-0312',
-      assignedAdvisorId: 'adv_3',
-    ),
-  ];
+  final List<Customer> _customers = [];
 
-  final List<PromissoryNote> _notes = [
-    // Ahmet Yılmaz (cust_1) - Yeni Şehir 3. Etap 6 Taksitlik Örnek Plan
-    PromissoryNote(
-      id: 'note_101',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-001',
-      installmentIndex: 1,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2026, 8, 15),
-      paidDate: DateTime(2026, 8, 14),
-      status: NoteStatus.paid,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 1. Elden Senet',
-      receiptFileName: 'ziraat_dekont_agustos.pdf',
-      paymentMethod: 'HAVALE / EFT (Ziraat Bankası)',
-    ),
-    PromissoryNote(
-      id: 'note_102',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-002',
-      installmentIndex: 2,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2026, 9, 15),
-      paidDate: DateTime(2026, 9, 15),
-      status: NoteStatus.paid,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 2. Elden Senet',
-      receiptFileName: 'garanti_fast_eylul.pdf',
-      paymentMethod: 'FAST / Havale (Garanti BBVA)',
-    ),
-    PromissoryNote(
-      id: 'note_103',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-003',
-      installmentIndex: 3,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2026, 10, 15),
-      status: NoteStatus.overdue,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 3. Elden Senet',
-    ),
-    PromissoryNote(
-      id: 'note_104',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-004',
-      installmentIndex: 4,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2026, 11, 15),
-      status: NoteStatus.verifying,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 4. Elden Senet',
-      receiptFileName: 'dekont_kasim_2026.jpg',
-      receiptNote: 'Ziraat Bankası IBAN hesabınıza EFT yapıldı.',
-      submittedAt: DateTime(2026, 11, 4, 11, 20),
-      paymentMethod: 'HAVALE / EFT (Ziraat Bankası)',
-    ),
-    PromissoryNote(
-      id: 'note_105',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-005',
-      installmentIndex: 5,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2026, 12, 15),
-      status: NoteStatus.pending,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 5. Elden Senet',
-    ),
-    PromissoryNote(
-      id: 'note_106',
-      customerId: 'cust_1',
-      senetNo: 'SNT-2026-006',
-      installmentIndex: 6,
-      totalInstallments: 6,
-      amount: 25000.0,
-      dueDate: DateTime(2027, 1, 15),
-      status: NoteStatus.pending,
-      description: 'Yeni Şehir 3. Etap (2+1 Teraslı Daire) - 6. Elden Senet',
-    ),
-
-    // Kaya Mimarlık (cust_2) - Asel Doğa Evleri 2
-    PromissoryNote(
-      id: 'note_201',
-      customerId: 'cust_2',
-      senetNo: 'SNT-2026-101',
-      installmentIndex: 1,
-      totalInstallments: 4,
-      amount: 85000.0,
-      dueDate: DateTime(2026, 9, 20),
-      paidDate: DateTime(2026, 9, 19),
-      status: NoteStatus.paid,
-      description: 'Asel Doğa Evleri 2 (Bahçe Teraslı Daire) - 1. Elden Senet',
-      receiptFileName: 'isbank_dekont_01.pdf',
-      paymentMethod: 'EFT (Türkiye İş Bankası)',
-    ),
-    PromissoryNote(
-      id: 'note_202',
-      customerId: 'cust_2',
-      senetNo: 'SNT-2026-102',
-      installmentIndex: 2,
-      totalInstallments: 4,
-      amount: 85000.0,
-      dueDate: DateTime(2026, 10, 20),
-      status: NoteStatus.verifying,
-      description: 'Asel Doğa Evleri 2 (Bahçe Teraslı Daire) - 2. Elden Senet',
-      receiptFileName: 'kaya_ekim_dekont.pdf',
-      receiptNote: 'Şirket hesabımızdan Garanti BBVA hesabınıza gönderildi.',
-      submittedAt: DateTime(2026, 11, 4, 09, 45),
-      paymentMethod: 'HAVALE / EFT (Garanti BBVA)',
-    ),
-    PromissoryNote(
-      id: 'note_203',
-      customerId: 'cust_2',
-      senetNo: 'SNT-2026-103',
-      installmentIndex: 3,
-      totalInstallments: 4,
-      amount: 85000.0,
-      dueDate: DateTime(2026, 11, 20),
-      status: NoteStatus.pending,
-      description: 'Asel Doğa Evleri 2 (Bahçe Teraslı Daire) - 3. Elden Senet',
-    ),
-    PromissoryNote(
-      id: 'note_204',
-      customerId: 'cust_2',
-      senetNo: 'SNT-2026-104',
-      installmentIndex: 4,
-      totalInstallments: 4,
-      amount: 85000.0,
-      dueDate: DateTime(2026, 12, 20),
-      status: NoteStatus.pending,
-      description: 'Asel Doğa Evleri 2 (Bahçe Teraslı Daire) - 4. Elden Senet',
-    ),
-
-    // Zeynep Demir (cust_3) - Almina Evleri 2
-    PromissoryNote(
-      id: 'note_301',
-      customerId: 'cust_3',
-      senetNo: 'SNT-2026-201',
-      installmentIndex: 1,
-      totalInstallments: 3,
-      amount: 42500.0,
-      dueDate: DateTime(2026, 10, 10),
-      paidDate: DateTime(2026, 10, 9),
-      status: NoteStatus.paid,
-      description: 'Almina Evleri 2 (2+1 Sahil Dairesi) - 1. Elden Senet',
-      paymentMethod: 'FAST (Ziraat Bankası)',
-    ),
-    PromissoryNote(
-      id: 'note_302',
-      customerId: 'cust_3',
-      senetNo: 'SNT-2026-202',
-      installmentIndex: 2,
-      totalInstallments: 3,
-      amount: 42500.0,
-      dueDate: DateTime(2026, 11, 10),
-      status: NoteStatus.pending,
-      description: 'Almina Evleri 2 (2+1 Sahil Dairesi) - 2. Elden Senet',
-    ),
-    PromissoryNote(
-      id: 'note_303',
-      customerId: 'cust_3',
-      senetNo: 'SNT-2026-203',
-      installmentIndex: 3,
-      totalInstallments: 3,
-      amount: 42500.0,
-      dueDate: DateTime(2026, 12, 10),
-      status: NoteStatus.pending,
-      description: 'Almina Evleri 2 (2+1 Sahil Dairesi) - 3. Elden Senet',
-    ),
-  ];
+  final List<PromissoryNote> _notes = [];
 
   final List<SupportTicket> _tickets = [];
 
-  final List<AppNotification> _notifications = [
-    AppNotification(
-      id: 'notif_1',
-      customerId: 'cust_1',
-      title: 'Gecikmiş Senet Hatırlatması',
-      body:
-          'SNT-2026-003 numaralı (25.000,00 ₺) senedinizin vade tarihi (15.10.2026) geçmiştir. Ödeme yaptıysanız lütfen dekont yükleyiniz.',
-      createdAt: DateTime(2026, 11, 3, 10, 00),
-      isRead: false,
-      type: 'overdue',
-    ),
-    AppNotification(
-      id: 'notif_2',
-      customerId: 'cust_1',
-      title: 'Finans Departmanından Yeni Mesaj',
-      body:
-          'SNT-2026-003 Gecikmiş Senet Ödeme Tarihi Hakkında konulu destek talebinize yanıt verildi.',
-      createdAt: DateTime(2026, 11, 4, 13, 15),
-      isRead: false,
-      type: 'message',
-    ),
-    AppNotification(
-      id: 'notif_3',
-      customerId: 'cust_1',
-      title: 'Dekontunuz İncelemeye Alındı',
-      body:
-          'SNT-2026-004 numaralı senediniz için yüklediğiniz dekont muhasebe birimine iletilmiştir.',
-      createdAt: DateTime(2026, 11, 4, 11, 20),
-      isRead: true,
-      type: 'approved',
-    ),
-  ];
+  final List<AppNotification> _notifications = [];
 
   void setRole(UserRole role) {
     _currentRole = role;
     notifyListeners();
+  }
+
+  void replaceBackendCustomerData({
+    required Map<String, dynamic> customerRow,
+    required List<Map<String, dynamic>> noteRows,
+    required List<Map<String, dynamic>> bankRows,
+  }) {
+    final customer = _customerFromRow(customerRow);
+    _customers
+      ..clear()
+      ..add(customer);
+    _selectedCustomerId = customer.id;
+    _notes
+      ..clear()
+      ..addAll(noteRows.map(_noteFromRow));
+    _replaceBankAccounts(bankRows);
+    final advisorName = customerRow['assigned_advisor_name']?.toString();
+    final advisorRow = customerRow['advisor'];
+    if (advisorRow is Map) {
+      _salesAdvisors
+        ..clear()
+        ..add(_salesAdvisorFromRow(advisorRow));
+    } else if (advisorName != null && advisorName.trim().isNotEmpty) {
+      _salesAdvisors
+        ..clear()
+        ..add(_unassignedAdvisor.copyWith(name: advisorName.trim()));
+    }
+    notifyListeners();
+  }
+
+  void replaceBackendPendingCustomer({
+    required String name,
+    required String phone,
+    required List<Map<String, dynamic>> bankRows,
+  }) {
+    const pendingId = 'pending_customer_profile';
+    _customers
+      ..clear()
+      ..add(
+        Customer(
+          id: pendingId,
+          name: name.trim().isEmpty ? 'Müşteri' : name.trim(),
+          tcOrTaxNo: '',
+          phone: phone,
+          email: '',
+          address: '',
+          contractNo: '',
+          assignedAdvisorId: '',
+          contractStatus: 'pending',
+          projectName: '',
+          unitLabel: '',
+          projectStatus: '',
+        ),
+      );
+    _selectedCustomerId = pendingId;
+    _notes.clear();
+    _tickets.clear();
+    _notifications.clear();
+    _replaceBankAccounts(bankRows);
+    notifyListeners();
+  }
+
+  void replaceBackendAdminData({
+    required List<Map<String, dynamic>> customerRows,
+    required List<Map<String, dynamic>> noteRows,
+    required List<Map<String, dynamic>> bankRows,
+  }) {
+    _customers
+      ..clear()
+      ..addAll(customerRows.map(_customerFromRow));
+    _notes
+      ..clear()
+      ..addAll(noteRows.map(_noteFromRow));
+    _replaceBankAccounts(bankRows);
+    _replaceSalesAdvisorsFromCustomers(customerRows);
+    if (_customers.isNotEmpty &&
+        !_customers.any((customer) => customer.id == _selectedCustomerId)) {
+      _selectedCustomerId = _customers.first.id;
+    }
+    notifyListeners();
+  }
+
+  void replaceBackendNotes(List<Map<String, dynamic>> rows) {
+    _notes
+      ..clear()
+      ..addAll(rows.map(_noteFromRow));
+    notifyListeners();
+  }
+
+  void replaceBackendCustomers(List<Map<String, dynamic>> rows) {
+    _customers
+      ..clear()
+      ..addAll(rows.map(_customerFromRow));
+    _replaceSalesAdvisorsFromCustomers(rows);
+    if (_customers.isNotEmpty &&
+        !_customers.any((customer) => customer.id == _selectedCustomerId)) {
+      _selectedCustomerId = _customers.first.id;
+    }
+    notifyListeners();
+  }
+
+  void _replaceSalesAdvisorsFromCustomers(
+    List<Map<String, dynamic>> customerRows,
+  ) {
+    final advisors = <String, SalesAdvisor>{};
+    for (final row in customerRows) {
+      final advisor = row['advisor'];
+      if (advisor is Map && advisor['id'] != null) {
+        final parsed = _salesAdvisorFromRow(advisor);
+        advisors[parsed.id] = parsed;
+      }
+    }
+    _salesAdvisors
+      ..clear()
+      ..addAll(advisors.values);
+  }
+
+  SalesAdvisor _salesAdvisorFromRow(Map advisor) => SalesAdvisor(
+    id: advisor['id']?.toString() ?? '',
+    name: advisor['full_name']?.toString() ?? 'Satış danışmanı',
+    roleTitle: 'Satış Danışmanı',
+    phone: advisor['contact_phone']?.toString() ?? '',
+    photoUrl: advisor['photo_url']?.toString() ?? '',
+    photoUpdatedAt:
+        DateTime.tryParse(advisor['photo_updated_at']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0),
+  );
+
+  void _replaceBankAccounts(List<Map<String, dynamic>> rows) {
+    _bankAccounts = rows.map((row) {
+      final name = row['bank_name']?.toString() ?? '';
+      final color = name.toLowerCase().contains('ziraat')
+          ? const Color(0xFFE11D48)
+          : name.toLowerCase().contains('garanti')
+          ? const Color(0xFF059669)
+          : const Color(0xFF1D4ED8);
+      return BankAccount(
+        bankName: name,
+        accountHolder: row['account_holder']?.toString() ?? '',
+        iban: row['iban']?.toString() ?? '',
+        branchName: row['branch_name']?.toString() ?? '',
+        brandColor: color,
+      );
+    }).toList();
+  }
+
+  Customer _customerFromRow(Map<String, dynamic> row) => Customer(
+    id: row['id'].toString(),
+    name: row['full_name']?.toString() ?? '',
+    tcOrTaxNo: row['national_or_tax_id']?.toString() ?? '',
+    phone: row['phone']?.toString() ?? '',
+    email: row['email']?.toString() ?? '',
+    address: row['address']?.toString() ?? '',
+    contractNo: row['contract_number']?.toString() ?? '',
+    assignedAdvisorId: row['assigned_advisor_id']?.toString() ?? '',
+    projectName: row['project_name']?.toString(),
+    unitLabel: row['unit_label']?.toString(),
+    projectStatus: row['project_status']?.toString(),
+    contractStatus: row['contract_status']?.toString() ?? 'approved',
+    folderId: row['folder_id']?.toString(),
+    folderName:
+        (row['folder'] as Map?)?['name']?.toString() ??
+        row['folder_name']?.toString(),
+    contractDocumentPath: (row['contract_document'] as Map?)?['storage_path']
+        ?.toString(),
+    contractDocumentName: (row['contract_document'] as Map?)?['file_name']
+        ?.toString(),
+  );
+
+  PromissoryNote _noteFromRow(Map<String, dynamic> row) {
+    final submissions =
+        (row['payment_submissions'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList()
+          ..sort(
+            (a, b) => (b['submitted_at']?.toString() ?? '').compareTo(
+              a['submitted_at']?.toString() ?? '',
+            ),
+          );
+    final Map<String, dynamic>? submission = submissions.isEmpty
+        ? null
+        : submissions.first;
+    final receiptPath = submission?['receipt_object_path']?.toString();
+    return PromissoryNote(
+      id: row['id'].toString(),
+      customerId: row['customer_id'].toString(),
+      senetNo: row['note_number']?.toString() ?? '',
+      installmentIndex: (row['installment_index'] as num?)?.toInt() ?? 1,
+      totalInstallments: (row['total_installments'] as num?)?.toInt() ?? 1,
+      amount: (row['amount'] as num?)?.toDouble() ?? 0,
+      dueDate:
+          DateTime.tryParse(row['due_date']?.toString() ?? '') ??
+          DateTime.now(),
+      paidDate: DateTime.tryParse(row['paid_at']?.toString() ?? ''),
+      status: NoteStatus.values.firstWhere(
+        (status) => status.name == row['status']?.toString(),
+        orElse: () => NoteStatus.pending,
+      ),
+      description: row['description']?.toString() ?? '',
+      receiptFileName: receiptPath?.split('/').last,
+      receiptObjectPath: receiptPath,
+      receiptNote: submission?['customer_note']?.toString(),
+      submittedAt: DateTime.tryParse(
+        submission?['submitted_at']?.toString() ?? '',
+      ),
+      paymentMethod: row['payment_method']?.toString(),
+      rejectionReason: submission?['rejection_reason']?.toString(),
+    );
   }
 
   void selectCustomer(String customerId) {
@@ -394,7 +407,8 @@ class AppState extends ChangeNotifier {
   double getCustomerOverdueAmount(String customerId) {
     return _notes
         .where(
-            (n) => n.customerId == customerId && n.status == NoteStatus.overdue)
+          (n) => n.customerId == customerId && n.status == NoteStatus.overdue,
+        )
         .fold(0.0, (sum, n) => sum + n.amount);
   }
 
@@ -415,10 +429,8 @@ class AppState extends ChangeNotifier {
       .fold(0.0, (sum, n) => sum + n.amount);
 
   Customer getCustomerById(String id) {
-    return _customers.firstWhere(
-      (c) => c.id == id,
-      orElse: () => _customers.first,
-    );
+    return _customers.where((customer) => customer.id == id).firstOrNull ??
+        _emptyCustomer;
   }
 
   // Customer action: Submit payment receipt / notification
@@ -694,10 +706,11 @@ class AppState extends ChangeNotifier {
 
     final ticket = _tickets[index];
     final customer = getCustomerById(ticket.customerId);
-    final advisor = _salesAdvisors.firstWhere(
-      (a) => a.id == customer.assignedAdvisorId,
-      orElse: () => _salesAdvisors.first,
-    );
+    final advisor =
+        _salesAdvisors
+            .where((a) => a.id == customer.assignedAdvisorId)
+            .firstOrNull ??
+        _unassignedAdvisor;
 
     final String adminSenderName;
     if (ticket.channel == 'advisor') {
