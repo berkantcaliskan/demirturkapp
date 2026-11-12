@@ -53,7 +53,8 @@ class _AuthScreenState extends State<AuthScreen> {
   bool get _isPhoneReadyForPassword =>
       _normalizePhone(_phoneController.text) != null;
 
-  bool get _showPasswordDotAnimation => _passwordDotsLatched;
+  bool get _showPasswordDotAnimation =>
+      _isRegistering || _resetPasswordReady || _passwordDotsLatched;
   // SMS-based reset stays in the repository for a future verified release,
   // but is intentionally unavailable while SMS OTP is disabled in this MVP.
   bool get _canRequestPasswordReset => false;
@@ -510,7 +511,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                   const SizedBox(height: 13),
                                   _AuthField(
                                     controller: _passwordController,
-                                    label: 'Parola',
+                                    label: '',
                                     hint: '6 haneli parolanız',
                                     icon: CupertinoIcons.lock,
                                     fill: fieldFill,
@@ -610,8 +611,8 @@ class _AuthScreenState extends State<AuthScreen> {
                                     const SizedBox(height: 13),
                                     _AuthField(
                                       controller: _confirmController,
-                                      label: 'Parola tekrarı',
-                                      hint: 'Parolanızı tekrar girin',
+                                      label: 'Parolanızı doğrulayın',
+                                      hint: 'Parolanızı doğrulayın',
                                       icon: CupertinoIcons.lock_shield,
                                       fill: fieldFill,
                                       foreground: foreground,
@@ -1338,4 +1339,3 @@ class _ManagerEntry extends StatelessWidget {
     );
   }
 }
-

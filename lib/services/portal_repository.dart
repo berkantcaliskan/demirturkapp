@@ -44,7 +44,30 @@ class PortalRepository {
         .from('customers')
         .select()
         .order('created_at', ascending: false);
-    return _attachCustomerRelations(rows);
+    final enrichedRows = await _attachCustomerRelations(rows);
+    final pendingContracts = await _client
+        .from('pending_contract_records')
+        .select(
+          'id, full_name, national_or_tax_id, phone, contract_number, assigned_advisor_id, folder_id, created_at',
+        )
+        .order('created_at', ascending: false);
+    enrichedRows.addAll(
+      pendingContracts.map(
+        (row) => {
+          'id': row['id'],
+          'full_name': row['full_name'],
+          'national_or_tax_id': row['national_or_tax_id'],
+          'phone': row['phone'],
+          'contract_number': row['contract_number'],
+          'assigned_advisor_id': row['assigned_advisor_id'],
+          'folder_id': row['folder_id'],
+          'contract_status': 'pending',
+          'email': '',
+          'address': '',
+        },
+      ),
+    );
+    return enrichedRows;
   }
 
   Future<List<Map<String, dynamic>>> _attachCustomerRelations(
@@ -208,6 +231,97 @@ class PortalRepository {
       } catch (_) {
         // Preserve the original database error. The unique staged path can be
         // cleaned up later by a staff-only Storage policy if needed.
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> createContract({
+    required String name,
+    required String nationalOrTaxId,
+    required String phone,
+    required String assignedAdvisorId,
+    required DateTime contractDate,
+    String? contractFileName,
+    Uint8List? contractFileBytes,
+    String? contractContentType,
+    String? folderId,
+  }) async {
+    final hasFile = contractFileBytes != null && contractFileBytes.isNotEmpty;
+    if (hasFile && (contractFileName == null || contractContentType == null)) {
+      throw const FormatException('Sözleşme dosyası bilgisi eksik.');
+    }
+    final uploaderId = currentUserId;
+    if (uploaderId == null) {
+      throw const AuthException(
+        'Sözleşme kaydetmek için personel oturumu gerekli.',
+      );
+    }
+    String? objectPath;
+    if (hasFile) {
+      final extension = contractFileName!.split('.').last.toLowerCase();
+      if (!const {'pdf', 'doc', 'docx'}.contains(extension)) {
+        throw const FormatException(
+          'Sözleşme yalnızca PDF veya Word olabilir.',
+        );
+      }
+      if (!const {
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }.contains(contractContentType)) {
+        throw const FormatException('Bu sözleşme dosyası türü desteklenmiyor.');
+      }
+      final safeName = contractFileName.replaceAll(
+        RegExp(r'[^A-Za-z0-9._-]'),
+        '_',
+      );
+      objectPath =
+          '$uploaderId/${DateTime.now().microsecondsSinceEpoch}_$safeName';
+      await _client.storage
+          .from('customer-contracts')
+          .uploadBinary(
+            objectPath,
+            contractFileBytes,
+            fileOptions: FileOptions(
+              contentType: contractContentType,
+              upsert: false,
+            ),
+          );
+    }
+    final contractDateText =
+        '${contractDate.year.toString().padLeft(4, '0')}-${contractDate.month.toString().padLeft(2, '0')}-${contractDate.day.toString().padLeft(2, '0')}';
+    try {
+      final customerId = await _client.rpc(
+        'create_contract_record',
+        params: {
+          'p_full_name': name.trim(),
+          'p_national_or_tax_id': nationalOrTaxId.trim(),
+          'p_phone': _normalizeTurkishPhone(phone),
+          'p_assigned_advisor_id': assignedAdvisorId,
+          'p_contract_date': contractDateText,
+          'p_folder_id': folderId,
+          'p_contract_storage_path': objectPath,
+          'p_contract_file_name': contractFileName,
+          'p_contract_content_type': contractContentType,
+        },
+      );
+      final rows = await _client
+          .from('customers')
+          .select()
+          .eq('id', customerId.toString());
+      if (rows.isNotEmpty) return rows.first;
+      final pending = await _client
+          .from('pending_contract_records')
+          .select('contract_number')
+          .eq('id', customerId.toString())
+          .single();
+      return pending;
+    } catch (_) {
+      if (objectPath != null) {
+        try {
+          await _client.storage.from('customer-contracts').remove([objectPath]);
+        } catch (_) {}
       }
       rethrow;
     }

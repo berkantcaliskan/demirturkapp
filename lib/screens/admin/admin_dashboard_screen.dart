@@ -1565,8 +1565,9 @@ class AdminDashboardScreen extends StatelessWidget {
 
   void _showAddCustomerSheet(BuildContext context) {
     final nameCtrl = TextEditingController();
-    final tcCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
+    final nameFocus = FocusNode();
+    final phoneFocus = FocusNode();
     String? advisorId;
     PlatformFile? contractFile;
     Uint8List? contractFileBytes;
@@ -1612,18 +1613,15 @@ class AdminDashboardScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     _buildSheetInput(
                       controller: nameCtrl,
+                      focusNode: nameFocus,
+                      nextFocusNode: phoneFocus,
                       placeholder: 'Müşteri Adı Soyadı / Firma Unvanı',
                     ),
                     const SizedBox(height: 10),
                     _buildSheetInput(
-                      controller: tcCtrl,
-                      placeholder: 'TC Kimlik No / Vergi No',
-                    ),
-                    const SizedBox(height: 10),
-                    _buildSheetInput(
                       controller: phoneCtrl,
+                      focusNode: phoneFocus,
                       placeholder: '5XX XXX XX XX',
-                      prefixText: '+90',
                       keyboardType: TextInputType.phone,
                       inputFormatters: [TurkishPhoneInputFormatter()],
                     ),
@@ -1747,7 +1745,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
-                                  'Sözleşme numarası otomatik verilir. Örnek: S/${contractYear}000001 (sıra her yıl yeniden başlar)',
+                                  'Sözleşme numarası otomatik verilir. İlk numara: S/${contractYear}000001; numara sırayla artar.',
                                   style: const TextStyle(
                                     color: Color(0xFFA9A39A),
                                     fontSize: 11.5,
@@ -1769,19 +1767,16 @@ class AdminDashboardScreen extends StatelessWidget {
                         onTap: () async {
                           if (saving) return;
                           final name = nameCtrl.text.trim();
-                          final nationalOrTaxId = tcCtrl.text.trim();
                           final phone = phoneCtrl.text.trim();
                           final file = contractFile;
                           if (name.isEmpty ||
-                              nationalOrTaxId.isEmpty ||
                               !_isValidTurkishPhone(phone) ||
                               advisorId == null ||
-                              file == null ||
-                              contractFileBytes == null) {
+                              (file != null && contractFileBytes == null)) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                  'Ad, T.C./vergi no, telefon, danışman ve sözleşme dosyası zorunludur.',
+                                  'Ad, telefon ve danışman zorunludur. Sözleşme dosyası isteğe bağlıdır.',
                                 ),
                               ),
                             );
@@ -1801,7 +1796,7 @@ class AdminDashboardScreen extends StatelessWidget {
 
                           try {
                             setModalState(() => saving = true);
-                            final extension = file.name
+                            final extension = file?.name
                                 .split('.')
                                 .last
                                 .toLowerCase();
@@ -1811,15 +1806,17 @@ class AdminDashboardScreen extends StatelessWidget {
                               _ => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                             };
                             final savedCustomer = await repository!
-                                .createCustomer(
+                                .createContract(
                                   name: name,
-                                  nationalOrTaxId: nationalOrTaxId,
+                                  nationalOrTaxId: '',
                                   phone: phone,
                                   assignedAdvisorId: advisorId!,
                                   contractDate: DateTime.now(),
-                                  contractFileName: file.name,
-                                  contractFileBytes: contractFileBytes!,
-                                  contractContentType: contentType,
+                                  contractFileName: file?.name,
+                                  contractFileBytes: contractFileBytes,
+                                  contractContentType: file == null
+                                      ? null
+                                      : contentType,
                                 );
                             appState.replaceBackendCustomers(
                               await repository!.loadCustomers(),
@@ -1831,7 +1828,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 backgroundColor: const Color(0xFF059669),
                                 behavior: SnackBarBehavior.floating,
                                 content: Text(
-                                  'Müşteri kaydedildi • Sözleşme: ${savedCustomer['contract_number']}',
+                                  'Sözleşme kaydedildi • Numara: ${savedCustomer['contract_number'] ?? 'beklemede'}',
                                 ),
                               ),
                             );
@@ -1866,12 +1863,25 @@ class AdminDashboardScreen extends StatelessWidget {
   Widget _buildSheetInput({
     required TextEditingController controller,
     required String placeholder,
+    FocusNode? focusNode,
+    FocusNode? nextFocusNode,
     String? prefixText,
     TextInputType? keyboardType,
     List<TextInputFormatter>? inputFormatters,
   }) {
     return CupertinoTextField(
       controller: controller,
+      focusNode: focusNode,
+      textInputAction: nextFocusNode == null
+          ? TextInputAction.done
+          : TextInputAction.next,
+      onSubmitted: (_) {
+        if (nextFocusNode != null) {
+          nextFocusNode.requestFocus();
+        } else {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
       placeholder: placeholder,
       keyboardType: keyboardType,
       inputFormatters: inputFormatters,
