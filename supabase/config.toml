@@ -1,3 +1,9 @@
 [functions.send-push]
 verify_jwt = false
 
+[functions.register-phone-account]
+verify_jwt = false
+
+[functions.provision-staff-account]
+verify_jwt = false
+

@@ -1,9 +1,5 @@
-import 'dart:convert';
-
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'backend_config.dart';
 
 /// Supabase Auth boundary used by the presentation layer.
 /// Keeping the SDK here avoids coupling screens and state to Supabase types.
@@ -15,39 +11,26 @@ class AuthRepository {
   User? get currentUser => _client.auth.currentUser;
   Stream<AuthState> get authChanges => _client.auth.onAuthStateChange;
 
-  /// Phone signup is allowed only when Supabase auto-confirms the phone.
-  /// This public Auth setting check prevents a signup attempt from triggering
-  /// a paid SMS while the project still requires an OTP.
-  Future<bool> phoneSignupWithoutSmsIsEnabled() async {
-    final config = BackendConfig.fromEnvironment();
-    if (!config.isConfigured) return false;
-    try {
-      final response = await http
-          .get(
-            Uri.parse('${config.url}/auth/v1/settings'),
-            headers: {'apikey': config.publishableKey!},
-          )
-          .timeout(const Duration(seconds: 8));
-      if (response.statusCode != 200) return false;
-      final settings = jsonDecode(response.body) as Map<String, dynamic>;
-      final providers = settings['external'] as Map<String, dynamic>?;
-      return providers?['phone'] == true &&
-          settings['phone_autoconfirm'] == true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<AuthResponse> register({
     required String phone,
     required String password,
-    required String fullName,
-  }) {
-    return _client.auth.signUp(
-      phone: phone,
-      password: password,
-      data: {'full_name': fullName.trim()},
-    );
+  }) async {
+    try {
+      await _client.functions.invoke(
+        'register-phone-account',
+        body: {
+          'phone': phone,
+          'password': password,
+        },
+      );
+    } on FunctionException catch (error) {
+      final details = error.details;
+      final message = details is Map ? details['error']?.toString() : null;
+      throw AuthException(
+        message ?? 'Hesap açılamadı. Bilgilerinizi kontrol edip tekrar deneyin.',
+      );
+    }
+    return signIn(phone: phone, password: password);
   }
 
   Future<AuthResponse> signIn({
