@@ -1,4 +1,2297 @@
-YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíß_7Ù:-jZ.¶›­–)Þ³V–×÷'Bw6¶vS¦fÇWGFW"ö7WW'F–æòæF'Bs°Ð¦–×÷'Bw6¶vS¦fÇWGFW"öÖFW&–ÂæF'Bs°Ð¦–×÷'Bw6¶vS¦fÇWGFW"÷6W'f–6W2æF'Bs°Ð¦–×÷'Bw6¶vS¦f–ÆU÷–6¶W"öf–ÆU÷–6¶W"æF'Bs°Ð¦–×÷'Bw6¶vS§W&ÅöÆVæ6†W"÷W&ÅöÆVæ6†W"æF'Bs°Ð Ð¦–×÷'BrââòââöÖöFVÇ2ööÖöFVÇ2æF'Bs°Ð¦–×÷'Brââòââ÷6W'f–6W2ö÷7FFRæF'Bs°Ð¦–×÷'Brââòââ÷6W'f–6W2÷÷'FÅ÷&W÷6—F÷'’æF'Bs°Ð¦–×÷'Brââòââ÷WF–Ç2÷GW&¶—6…÷†öæUö–çWEöf÷&ÖGFW"æF'Bs°Ð¦–×÷'BvFÖ–å÷7W÷'Eö–æ&÷…÷67&VVâæF'Bs°Ð¦–×÷'Brââòââ÷v–FvWG2÷vV'6—FUö&ÇW'&VEö&6¶w&÷VæBæF'Bs°Ð¦–×÷'Brââö7W7FöÖW"ö7W7FöÖW%÷7W÷'E÷67&VVâæF'Bs°Ð Ð¦6Æ72FÖ–äF6†&ö&E67&VVâW‡FVæG27FFVÆW75v–FvWB°Ð¢f–æÂ7FFR7FFS°Ð¢f–æÂ–çB7F—fUF$–æFWƒ°Ð¢f–æÂ÷'FÅ&W÷6—F÷'“ò&W÷6—F÷'“°Ð Ð¢6öç7BFÖ–äF6†&ö&E67&VVâ‡°Ð¢7WW"æ¶W’ÀÐ¢&WV—&VBF†—2æ7FFRÀÐ¢&WV—&VBF†—2æ7F—fUF$–æFW‚ÀÐ¢F†—2ç&W÷6—F÷'’ÀÐ¢Ò“°Ð Ð¢÷fW'&–FPÐ¢v–FvWB'V–ÆB„'V–ÆD6öçFW‡B6öçFW‡B’°Ð¢–b†7FFRæ7W'&VçE&öÆRæ—56ÆW4Gf—6÷"’°Ð¢&WGW&â7v—F6‚†7F—fUF$–æFW‚’°Ð¢Óâö'V–ÆD7W7FöÖW'5F"†6öçFW‡B’ÀÐ¢Óâö'V–ÆD7W7FöÖW'5F"†6öçFW‡BÂ&ö6W74öæÇ“¢G'VR’ÀÐ¢"ÓàÐ¢&W÷6—F÷'’ÓÒçVÆÀÐ¢òö'V–ÆDÖW76vW5F"†6öçFW‡BÐ¢¢FÖ–å7W÷'D–æ&÷…67&VVâ‡&W÷6—F÷'“¢&W÷6—F÷'’’ÀÐ¢2ÓàÐ¢&W÷6—F÷'’ÓÒçVÆÀÐ¢òö'V–ÆDÖW76vW5F"†6öçFW‡BÐ¢¢FÖ–å7W÷'D–æ&÷…67&VVâ€Ð¢&W÷6—F÷'“¢&W÷6—F÷'’ÀÐ¢6Æ÷6VDöæÇ“¢G'VRÀÐ¢’ÀÐ¢ôó}­¢G§²ÚîÆ­yÐ_folderId
+import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../models/app_models.dart';
+import '../../services/app_state.dart';
+import '../../services/portal_repository.dart';
+import '../../utils/turkish_phone_input_formatter.dart';
+import 'admin_support_inbox_screen.dart';
+import '../../widgets/website_blurred_background.dart';
+import '../customer/customer_support_screen.dart';
+
+class AdminDashboardScreen extends StatelessWidget {
+  final AppState appState;
+  final int activeTabIndex;
+  final PortalRepository? repository;
+
+  const AdminDashboardScreen({
+    super.key,
+    required this.appState,
+    required this.activeTabIndex,
+    this.repository,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (appState.currentRole.isSalesAdvisor) {
+      return switch (activeTabIndex) {
+        0 => _buildCustomersTab(context),
+        1 => _buildCustomersTab(context, processOnly: true),
+        2 =>
+          repository == null
+              ? _buildMessagesTab(context)
+              : AdminSupportInboxScreen(repository: repository!),
+        3 =>
+          repository == null
+              ? _buildMessagesTab(context)
+              : AdminSupportInboxScreen(
+                  repository: repository!,
+                  closedOnly: true,
+                ),
+        _ => _buildCustomersTab(context),
+      };
+    }
+    switch (activeTabIndex) {
+      case 0:
+        return _buildApprovalsAndOverviewTab(context);
+      case 1:
+        return _buildAllNotesTab(context);
+      case 2:
+        return _buildCustomersTab(context);
+      case 3:
+        return repository == null
+            ? _buildMessagesTab(context)
+            : AdminSupportInboxScreen(repository: repository!);
+      case 4:
+        return repository == null
+            ? _buildMessagesTab(context)
+            : AdminSupportInboxScreen(
+                repository: repository!,
+                closedOnly: true,
+              );
+      default:
+        return _buildApprovalsAndOverviewTab(context);
+    }
+  }
+
+  Widget _buildApprovalsAndOverviewTab(BuildContext context) {
+    final verifyingNotes = appState.allNotes
+        .where((n) => n.status == NoteStatus.verifying)
+        .toList();
+    final overdueNotes = appState.allNotes
+        .where((n) => n.status == NoteStatus.overdue)
+        .toList();
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        // Company KPI Grid (iOS Frosted Glass Hero Card)
+        GlassCard(
+          tone: GlassCardTone.hero,
+          borderRadius: 24,
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    CupertinoIcons.chart_bar_alt_fill,
+                    color: Color(0xFF64D2FF),
+                    size: 19,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'ÅžÄ°RKET GENEL SENET & TAHSÄ°LAT Ã–ZETÄ°',
+                      style: TextStyle(
+                        color: AppGlass.textSecondary(context),
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildKpiBox(
+                      context,
+                      'Toplam PortfÃ¶y',
+                      formatCurrency(appState.companyTotalReceivables),
+                      const Color(0xFF64D2FF),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildKpiBox(
+                      context,
+                      'Tahsil Edilen',
+                      formatCurrency(appState.companyTotalCollected),
+                      const Color(0xFF30D158),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildKpiBox(
+                      context,
+                      'Onay Bekleyen Dekont',
+                      formatCurrency(appState.companyTotalVerifying),
+                      const Color(0xFFFFD60A),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildKpiBox(
+                      context,
+                      'GecikmiÅŸ Alacak',
+                      formatCurrency(appState.companyTotalOverdue),
+                      const Color(0xFFFF453A),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        // Section: Onay Bekleyen Dekontlar
+        Row(
+          children: [
+            const Icon(
+              CupertinoIcons.timelapse,
+              color: Color(0xFFFFD60A),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Onay Bekleyen Dekontlar (${verifyingNotes.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        if (verifyingNotes.isEmpty)
+          GlassCard(
+            borderRadius: 20,
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const Icon(
+                  CupertinoIcons.checkmark_seal_fill,
+                  color: Color(0xFF30D158),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ä°ncelenmeyi bekleyen dekont bulunmuyor.',
+                    style: TextStyle(color: AppGlass.textSecondary(context)),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          ...verifyingNotes.map((note) {
+            final customer = appState.getCustomerById(note.customerId);
+            return GlassCard(
+              tone: GlassCardTone.warningAmber,
+              margin: const EdgeInsets.only(bottom: 12),
+              borderRadius: 22,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          customer.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15.5,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        formatCurrency(note.amount),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16.5,
+                          letterSpacing: -0.3,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${note.senetNo} (${note.installmentIndex}/${note.totalInstallments}. Senet) â€¢ Vade: ${formatShortDate(note.dueDate)}',
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: AppGlass.textSecondary(context),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppGlass.subtleSurface(context),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        width: 0.6,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (note.receiptObjectPath != null &&
+                            repository != null)
+                          CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            alignment: Alignment.centerLeft,
+                            onPressed: () async {
+                              try {
+                                final uri = await repository!
+                                    .getPaymentReceiptUrl(
+                                      note.receiptObjectPath!,
+                                    );
+                                await launchUrl(
+                                  uri,
+                                  mode: LaunchMode.externalApplication,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Dekont aÃ§Ä±lamadÄ±: $error'),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  CupertinoIcons.paperclip,
+                                  size: 16,
+                                  color: Color(0xFF64D2FF),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    'Dekontu aÃ§ â€¢ ${note.receiptFileName ?? 'dosya'}',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5,
+                                      color: Color(0xFF64D2FF),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Row(
+                            children: [
+                              const Icon(
+                                CupertinoIcons.paperclip,
+                                size: 16,
+                                color: Color(0xFF64D2FF),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Dosya: ${note.receiptFileName ?? "dekont.pdf"}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 12.5,
+                                    color: Color(0xFF64D2FF),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        if (note.paymentMethod != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'YÃ¶ntem: ${note.paymentMethod}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                        if (note.receiptNote != null &&
+                            note.receiptNote!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'MÃ¼ÅŸteri Notu: "${note.receiptNote}"',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color: AppGlass.textMuted(context),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: IosGlassButton(
+                          isSecondaryGlass: true,
+                          icon: CupertinoIcons.xmark_circle,
+                          label: 'Reddet',
+                          onTap: () =>
+                              _showRejectDialog(context, note.id, note.senetNo),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: IosGlassButton(
+                          color: const Color(0xFF30D158),
+                          icon: CupertinoIcons.checkmark_alt_circle_fill,
+                          label: 'Ã–demeyi Onayla',
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.approveNotePayment(note.id);
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: note.id,
+                                  approved: true,
+                                  paymentMethod: note.paymentMethod,
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Onay kaydedilemedi: $error'),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF059669),
+                                content: Text(
+                                  '${note.senetNo} Ã¶demesi onaylandÄ± ve mÃ¼ÅŸteriye bildirim gÃ¶nderildi!',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+
+        const SizedBox(height: 18),
+
+        // Section: Geciken Senetler & HatÄ±rlatma
+        Row(
+          children: [
+            const Icon(
+              CupertinoIcons.exclamationmark_triangle_fill,
+              color: Color(0xFFFF453A),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Vadesi GeÃ§miÅŸ Senetler (${overdueNotes.length})',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: -0.3,
+                  color: Colors.white,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+
+        if (overdueNotes.isEmpty)
+          GlassCard(
+            borderRadius: 20,
+            padding: const EdgeInsets.all(20),
+            child: Text(
+              'GecikmiÅŸ senet bulunmamaktadÄ±r.',
+              style: TextStyle(color: AppGlass.textSecondary(context)),
+            ),
+          )
+        else
+          ...overdueNotes.map((note) {
+            final customer = appState.getCustomerById(note.customerId);
+            return GlassCard(
+              tone: GlassCardTone.urgentRed,
+              margin: const EdgeInsets.only(bottom: 12),
+              borderRadius: 22,
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          customer.name,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                            letterSpacing: -0.3,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        formatCurrency(note.amount),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: Color(0xFFFF6961),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${note.senetNo} â€¢ Vade: ${formatShortDate(note.dueDate)} â€¢ Tel: ${customer.phone}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppGlass.textSecondary(context),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: IosGlassButton(
+                          isSecondaryGlass: true,
+                          icon: CupertinoIcons.bell_fill,
+                          label: 'HatÄ±rlatma GÃ¶nder',
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.sendPaymentReminder(note);
+                            } else {
+                              try {
+                                await repository!.sendPaymentReminder(
+                                  customerId: note.customerId,
+                                  noteNumber: note.senetNo,
+                                  dueDate: formatShortDate(note.dueDate),
+                                  amountText: formatCurrency(note.amount),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'HatÄ±rlatma gÃ¶nderilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${customer.name} adlÄ± mÃ¼ÅŸteriye Ã¶deme hatÄ±rlatma bildirimi gÃ¶nderildi.',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: IosGlassButton(
+                          icon: CupertinoIcons.checkmark_alt_circle_fill,
+                          label: 'Tahsil Edildi',
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.approveNotePayment(
+                                note.id,
+                                customMethod: 'Åžirket Veznesi / Elden Tahsilat',
+                              );
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: note.id,
+                                  approved: true,
+                                  paymentMethod:
+                                      'Åžirket Veznesi / Elden Tahsilat',
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Tahsilat kaydedilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  '${note.senetNo} elden tahsil edildi olarak iÅŸaretlendi.',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+      ],
+    );
+  }
+
+  Widget _buildAllNotesTab(BuildContext context) {
+    final notes = appState.allNotes.toList()
+      ..sort((a, b) => a.dueDate.compareTo(b.dueDate));
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        GlassCard(
+          tone: GlassCardTone.infoBlue,
+          borderRadius: 22,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Yeni Senet / Taksit PlanÄ± OluÅŸtur',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        letterSpacing: -0.3,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'MÃ¼ÅŸteriye tek senet veya sÄ±ralÄ± aylÄ±k taksit planÄ± tanÄ±mlayÄ±n',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppGlass.textSecondary(context),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              IosGlassButton(
+                onTap: () => _showCreateInstallmentSheet(context),
+                icon: CupertinoIcons.add,
+                label: 'Senet Ekle',
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'TÃ¼m MÃ¼ÅŸteri Senetleri (${notes.length})',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...notes.map((note) {
+          final customer = appState.getCustomerById(note.customerId);
+          return GlassCard(
+            margin: const EdgeInsets.only(bottom: 10),
+            borderRadius: 20,
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: note.status.bgColor,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: note.status.color.withValues(alpha: 0.45),
+                      width: 0.7,
+                    ),
+                  ),
+                  child: Icon(
+                    note.status.icon,
+                    color: note.status.color,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${customer.name} â€¢ ${note.senetNo}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          letterSpacing: -0.2,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Vade: ${formatShortDate(note.dueDate)} (${note.installmentIndex}/${note.totalInstallments}. Taksit)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppGlass.textMuted(context),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      formatCurrency(note.amount),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.5,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    if (note.status != NoteStatus.paid)
+                      CupertinoButton(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        onPressed: () async {
+                          if (repository == null) {
+                            appState.approveNotePayment(note.id);
+                          } else {
+                            try {
+                              await repository!.reviewPaymentSubmission(
+                                noteId: note.id,
+                                approved: true,
+                                paymentMethod: note.paymentMethod,
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'GÃ¼ncelleme kaydedilemedi: $error',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                          }
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '${note.senetNo} Ã¶dendi olarak iÅŸaretlendi.',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 3.5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0A84FF)
+                                .withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: const Color(0xFF64D2FF)
+                                  .withValues(alpha: 0.5),
+                              width: 0.6,
+                            ),
+                          ),
+                          child: const Text(
+                            'Tahsil Et âœ“',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF64D2FF),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        'Ã–dendi',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w700,
+                          color: note.status.color,
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildCustomersTab(BuildContext context, {bool processOnly = false}) {
+    final visibleCustomers = [...appState.customers];
+    visibleCustomers.sort((a, b) {
+      final folderOrder = (a.folderName ?? '').compareTo(b.folderName ?? '');
+      return folderOrder == 0 ? a.name.compareTo(b.name) : folderOrder;
+    });
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              processOnly
+                  ? 'Ä°nÅŸaat SÃ¼reÃ§leri (${appState.customers.length})'
+                  : 'KayÄ±tlÄ± MÃ¼ÅŸteriler (${appState.customers.length})',
+              style: const TextStyle(
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.3,
+                color: Colors.white,
+              ),
+            ),
+            if (!processOnly && appState.currentRole.canManageAllCustomers)
+              IosGlassButton(
+                onTap: () => _showAddCustomerSheet(context),
+                color: const Color(0xFFFF9F0A),
+                icon: CupertinoIcons.person_add_solid,
+                label: 'Yeni MÃ¼ÅŸteri Ekle',
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 13,
+                  vertical: 8,
+                ),
+                borderRadius: 18,
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (!processOnly &&
+            repository != null &&
+            appState.currentRole.canManageAllCustomers) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IosGlassButton(
+              onTap: () => _showAccountLinkReview(context),
+              icon: CupertinoIcons.link,
+              label: 'Bekleyen hesap eÅŸleÅŸmeleri',
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              borderRadius: 18,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (!processOnly && repository != null)
+          _CustomerFolderManager(
+            repository: repository!,
+            customers: visibleCustomers,
+          ),
+        ...visibleCustomers.map((c) {
+          final total = appState.getCustomerTotalAmount(c.id);
+          final paid = appState.getCustomerPaidAmount(c.id);
+          final remaining = appState.getCustomerRemainingAmount(c.id);
+
+          return GlassCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            borderRadius: 22,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFF0A84FF).withValues(alpha: 0.45),
+                            const Color(0xFF64D2FF).withValues(alpha: 0.25),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.40),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        c.name.substring(0, 1),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            c.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              letterSpacing: -0.3,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            '${c.folderName == null ? '' : '[${c.folderName}] â€¢ '}${c.contractNo.isEmpty ? 'SÃ¶zleÅŸme bekliyor' : 'SÃ¶zleÅŸme: ${c.contractNo}'} â€¢ Tel: ${c.phone}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppGlass.textMuted(context),
+                            ),
+                          ),
+                          if (c.contractPending ||
+                              (c.projectStatus?.trim().isNotEmpty ??
+                                  false)) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              c.contractPending
+                                  ? 'SÃ¶zleÅŸme onay bekliyor'
+                                  : c.projectStatus!,
+                              style: const TextStyle(
+                                color: Color(0xFFFF9F0A),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    CupertinoButton(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      onPressed: () {
+                        appState.selectCustomer(c.id);
+                        appState.setRole(UserRole.customer);
+                      },
+                      child: const Row(
+                        children: [
+                          Text(
+                            'MÃ¼ÅŸteri EkranÄ±',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64D2FF),
+                            ),
+                          ),
+                          SizedBox(width: 3),
+                          Icon(
+                            CupertinoIcons.chevron_forward,
+                            size: 13,
+                            color: Color(0xFF64D2FF),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Divider(
+                    height: 1,
+                    color: AppGlass.dividerColor(context),
+                  ),
+                ),
+                if (repository != null)
+                  _CustomerFolderAssignment(
+                    repository: repository!,
+                    customer: c,
+                  ),
+                if (appState.currentRole.canSeePromissoryNotes)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Toplam Senet',
+                          formatCurrency(total),
+                          Colors.white,
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Tahsil Edilen',
+                          formatCurrency(paid),
+                          const Color(0xFF30D158),
+                        ),
+                      ),
+                      Expanded(
+                        child: _buildMiniBalance(
+                          context,
+                          'Kalan Bakiye',
+                          formatCurrency(remaining),
+                          const Color(0xFFFF453A),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildMessagesTab(BuildContext context) {
+    final tickets = appState.allTickets;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+      children: [
+        Text(
+          'MÃ¼ÅŸteri Destek & Ä°letiÅŸim Talepleri (${tickets.length})',
+          style: const TextStyle(
+            fontSize: 16.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.3,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 12),
+        ...tickets.map((ticket) {
+          final customer = appState.getCustomerById(ticket.customerId);
+          final lastMsg = ticket.messages.isNotEmpty
+              ? ticket.messages.last
+              : null;
+
+          return GlassCard(
+            margin: const EdgeInsets.only(bottom: 12),
+            borderRadius: 20,
+            child: CupertinoButton(
+              padding: const EdgeInsets.all(16),
+              pressedOpacity: 0.7,
+              onPressed: () => showTicketChatModal(
+                context,
+                appState: appState,
+                ticketId: ticket.id,
+                isAdminMode: true,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                customer.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: Color(0xFF64D2FF),
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: ticket.isResolved
+                                    ? const Color(0xFF30D158)
+                                          .withValues(alpha: 0.22)
+                                    : const Color(0xFFFF9F0A)
+                                          .withValues(alpha: 0.22),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: ticket.isResolved
+                                      ? const Color(0xFF30D158)
+                                            .withValues(alpha: 0.5)
+                                      : const Color(0xFFFFD60A)
+                                            .withValues(alpha: 0.5),
+                                  width: 0.6,
+                                ),
+                              ),
+                              child: Text(
+                                ticket.isResolved
+                                    ? 'Ã‡Ã¶zÃ¼ldÃ¼'
+                                    : 'YanÄ±t Bekliyor',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: ticket.isResolved
+                                      ? const Color(0xFF30D158)
+                                      : const Color(0xFFFFD60A),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          ticket.subject,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.5,
+                            letterSpacing: -0.2,
+                            color: Colors.white,
+                          ),
+                        ),
+                        if (lastMsg != null) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '${lastMsg.senderName}: ${lastMsg.text}',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: AppGlass.textSecondary(context),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    CupertinoIcons.chevron_forward,
+                    size: 16,
+                    color: AppGlass.textMuted(context),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildKpiBox(
+    BuildContext context,
+    String label,
+    String value,
+    Color accent,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: AppGlass.subtleSurface(context),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.20),
+          width: 0.6,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: AppGlass.textMuted(context),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              color: accent,
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniBalance(
+    BuildContext context,
+    String label,
+    String value,
+    Color color,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(fontSize: 11, color: AppGlass.textMuted(context)),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.2,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showRejectDialog(BuildContext context, String noteId, String senetNo) {
+    final reasonCtrl = TextEditingController(
+      text: 'Dekont tutarÄ± veya alÄ±cÄ± hesap bilgisi eÅŸleÅŸmedi.',
+    );
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: IosGlassSheet(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4.5,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '$senetNo Dekontunu Reddet',
+                    style: const TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  CupertinoTextField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    padding: const EdgeInsets.all(13),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        width: 0.7,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: IosGlassButton(
+                          isSecondaryGlass: true,
+                          label: 'VazgeÃ§',
+                          onTap: () => Navigator.pop(ctx),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: IosGlassButton(
+                          isDestructive: true,
+                          icon: CupertinoIcons.xmark_circle_fill,
+                          label: 'Reddet',
+                          onTap: () async {
+                            if (repository == null) {
+                              appState.rejectNotePayment(
+                                noteId,
+                                reasonCtrl.text.trim(),
+                              );
+                            } else {
+                              try {
+                                await repository!.reviewPaymentSubmission(
+                                  noteId: noteId,
+                                  approved: false,
+                                  rejectionReason: reasonCtrl.text.trim(),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Ret kaydedilemedi: $error'),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCreateInstallmentSheet(BuildContext context) {
+    if (appState.customers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Ã–nce bir mÃ¼ÅŸteri kaydÄ± oluÅŸturun.')),
+      );
+      return;
+    }
+    String selectedCustomerId = appState.customers.first.id;
+    final amountCtrl = TextEditingController(text: '30000');
+    final descCtrl = TextEditingController(text: 'Yeni SÃ¶zleÅŸme Senet PlanÄ±');
+    int installmentCount = 6;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: IosGlassSheet(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4.5,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Yeni Senet / Taksit PlanÄ± TanÄ±mla',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'MÃ¼ÅŸteri SeÃ§in',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: appState.customers.map((c) {
+                          final active = c.id == selectedCustomerId;
+                          return CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            onPressed: () =>
+                                setModalState(() => selectedCustomerId = c.id),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? const Color(0xFF0A84FF)
+                                          .withValues(alpha: 0.85)
+                                    : Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: active
+                                      ? Colors.white.withValues(alpha: 0.6)
+                                      : Colors.white.withValues(alpha: 0.2),
+                                  width: 0.7,
+                                ),
+                              ),
+                              child: Text(
+                                c.name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Her Senet TutarÄ± (â‚º)',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      CupertinoTextField(
+                        controller: amountCtrl,
+                        keyboardType: TextInputType.number,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.24),
+                            width: 0.7,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Senet Adedi (Ay)',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 8,
+                        children: [1, 3, 6, 12, 18, 24].map((cnt) {
+                          final active = cnt == installmentCount;
+                          return CupertinoButton(
+                            padding: EdgeInsets.zero,
+                            minimumSize: Size.zero,
+                            onPressed: () =>
+                                setModalState(() => installmentCount = cnt),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 13,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: active
+                                    ? const Color(0xFF0A84FF)
+                                          .withValues(alpha: 0.85)
+                                    : Colors.white.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: active
+                                      ? Colors.white.withValues(alpha: 0.6)
+                                      : Colors.white.withValues(alpha: 0.2),
+                                  width: 0.7,
+                                ),
+                              ),
+                              child: Text(
+                                '$cnt Ay',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'SÃ¶zleÅŸme / Senet AÃ§Ä±klamasÄ±',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      CupertinoTextField(
+                        controller: descCtrl,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                        ),
+                        padding: const EdgeInsets.all(13),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.24),
+                            width: 0.7,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        width: double.infinity,
+                        child: IosGlassButton(
+                          icon: CupertinoIcons.checkmark_alt_circle_fill,
+                          label: 'Senet PlanÄ±nÄ± OluÅŸtur',
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          onTap: () async {
+                            final amount =
+                                double.tryParse(amountCtrl.text.trim()) ??
+                                25000.0;
+                            if (repository == null) {
+                              appState.createInstallmentPlan(
+                                customerId: selectedCustomerId,
+                                monthlyAmount: amount,
+                                installmentCount: installmentCount,
+                                firstDueDate: DateTime(2026, 12, 15),
+                                descriptionPrefix: descCtrl.text.trim().isEmpty
+                                    ? 'Senet Ã–demesi'
+                                    : descCtrl.text.trim(),
+                              );
+                            } else {
+                              try {
+                                await repository!.createInstallmentPlan(
+                                  customerId: selectedCustomerId,
+                                  monthlyAmount: amount,
+                                  installmentCount: installmentCount,
+                                  firstDueDate: DateTime(2026, 12, 15),
+                                  descriptionPrefix:
+                                      descCtrl.text.trim().isEmpty
+                                      ? 'Senet Ã–demesi'
+                                      : descCtrl.text.trim(),
+                                );
+                              } catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Senet planÄ± kaydedilemedi: $error',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+                            }
+                            if (!ctx.mounted || !context.mounted) return;
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF059669),
+                                content: Text(
+                                  '$installmentCount adet yeni senet baÅŸarÄ±yla oluÅŸturuldu!',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddCustomerSheet(BuildContext context) {
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final nameFocus = FocusNode();
+    final phoneFocus = FocusNode();
+    String? advisorId;
+    PlatformFile? contractFile;
+    Uint8List? contractFileBytes;
+    bool saving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) => Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            ),
+            child: IosGlassSheet(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4.5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Yeni MÃ¼ÅŸteri Cari KaydÄ± OluÅŸtur',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    _buildSheetInput(
+                      controller: nameCtrl,
+                      focusNode: nameFocus,
+                      nextFocusNode: phoneFocus,
+                      placeholder: 'MÃ¼ÅŸteri AdÄ± SoyadÄ± / Firma UnvanÄ±',
+                    ),
+                    const SizedBox(height: 10),
+                    _buildSheetInput(
+                      controller: phoneCtrl,
+                      focusNode: phoneFocus,
+                      placeholder: '5XX XXX XX XX',
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [TurkishPhoneInputFormatter()],
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.07),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.18),
+                        ),
+                      ),
+                      child: CupertinoButton(
+                        padding: const EdgeInsets.all(13),
+                        onPressed: saving
+                            ? null
+                            : () async {
+                                final picked = await FilePicker.pickFile(
+                                  type: FileType.custom,
+                                  allowedExtensions: const [
+                                    'pdf',
+                                    'doc',
+                                    'docx',
+                                  ],
+                                );
+                                if (picked == null) return;
+                                final bytes = await picked.readAsBytes();
+                                if (bytes.isEmpty) {
+                                  if (ctx.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Dosya okunamadÄ±. Tekrar seÃ§in.',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return;
+                                }
+                                setModalState(() {
+                                  contractFile = picked;
+                                  contractFileBytes = bytes;
+                                });
+                              },
+                        child: Row(
+                          children: [
+                            Icon(
+                              CupertinoIcons.doc_text,
+                              color: Color(0xFFE11D48),
+                              size: 19,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                contractFile?.name ??
+                                    'SÃ¶zleÅŸme dosyasÄ± seÃ§ (PDF / Word) *',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ),
+                            if (contractFile != null)
+                              const Icon(
+                                CupertinoIcons.checkmark_circle_fill,
+                                color: Color(0xFF34C759),
+                                size: 18,
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    FutureBuilder<List<Map<String, dynamic>>>(
+                      future:
+                          repository?.loadSalesAdvisors() ??
+                          Future.value(const <Map<String, dynamic>>[]),
+                      builder: (context, snapshot) {
+                        final advisors = snapshot.data ?? const [];
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const LinearProgressIndicator();
+                        }
+                        if (advisors.isEmpty) {
+                          return const Text(
+                            'Ã–nce en az bir SatÄ±ÅŸ DanÄ±ÅŸmanÄ± hesabÄ± tanÄ±mlayÄ±n.',
+                            style: TextStyle(color: Color(0xFFFF9F0A)),
+                          );
+                        }
+                        advisorId ??= advisors.first['id']?.toString();
+                        return StatefulBuilder(
+                          builder: (context, setFieldState) {
+                            final contractYear = DateTime.now().year;
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                DropdownButtonFormField<String>(
+                                  initialValue: advisorId,
+                                  dropdownColor: const Color(0xFF242220),
+                                  decoration: const InputDecoration(
+                                    labelText: 'Atanan satÄ±ÅŸ danÄ±ÅŸmanÄ±',
+                                    labelStyle: TextStyle(
+                                      color: Color(0xFFCDC8C0),
+                                    ),
+                                  ),
+                                  items: advisors.map((advisor) {
+                                    final staffId =
+                                        advisor['staff_id']?.toString() ?? '';
+                                    return DropdownMenuItem(
+                                      value: advisor['id'].toString(),
+                                      child: Text(
+                                        '${advisor['full_name']} â€¢ $staffId',
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) =>
+                                      setFieldState(() => advisorId = value),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'SÃ¶zleÅŸme numarasÄ± otomatik verilir. Ä°lk numara: S/${contractYear}000001; numara sÄ±rayla artar.',
+                                  style: const TextStyle(
+                                    color: Color(0xFFA9A39A),
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: IosGlassButton(
+                        icon: CupertinoIcons.person_add_solid,
+                        label: saving ? 'Kaydediliyorâ€¦' : 'MÃ¼ÅŸteriyi Kaydet',
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        onTap: () async {
+                          if (saving) return;
+                          final name = nameCtrl.text.trim();
+                          final phone = phoneCtrl.text.trim();
+                          final file = contractFile;
+                          if (name.isEmpty ||
+                              !_isValidTurkishPhone(phone) ||
+                              advisorId == null ||
+                              (file != null && contractFileBytes == null)) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Ad, telefon ve danÄ±ÅŸman zorunludur. SÃ¶zleÅŸme dosyasÄ± isteÄŸe baÄŸlÄ±dÄ±r.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          if (repository == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Sunucu oturumu yok; mÃ¼ÅŸteri Supabaseâ€™e gÃ¶nderilmedi. YÃ¶netici hesabÄ±yla yeniden giriÅŸ yapÄ±n.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          try {
+                            setModalState(() => saving = true);
+                            final extension = file?.name
+                                .split('.')
+                                .last
+                                .toLowerCase();
+                            final contentType = switch (extension) {
+                              'pdf' => 'application/pdf',
+                              'doc' => 'application/msword',
+                              _ => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                            };
+                            final savedCustomer = await repository!
+                                .createContract(
+                                  name: name,
+                                  nationalOrTaxId: '',
+                                  phone: phone,
+                                  assignedAdvisorId: advisorId!,
+                                  contractDate: DateTime.now(),
+                                  contractFileName: file?.name,
+                                  contractFileBytes: contractFileBytes,
+                                  contractContentType: file == null
+                                      ? null
+                                      : contentType,
+                                );
+                            appState.replaceBackendCustomers(
+                              await repository!.loadCustomers(),
+                            );
+                            if (!ctx.mounted || !context.mounted) return;
+                            Navigator.pop(ctx);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                backgroundColor: const Color(0xFF059669),
+                                behavior: SnackBarBehavior.floating,
+                                content: Text(
+                                  'SÃ¶zleÅŸme kaydedildi â€¢ Numara: ${savedCustomer['contract_number'] ?? 'beklemede'}',
+                                ),
+                              ),
+                            );
+                            return;
+                          } catch (error) {
+                            if (ctx.mounted) {
+                              setModalState(() => saving = false);
+                            }
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  'MÃ¼ÅŸteri Supabaseâ€™e gÃ¶nderilemedi: $error',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSheetInput({
+    required TextEditingController controller,
+    required String placeholder,
+    FocusNode? focusNode,
+    FocusNode? nextFocusNode,
+    String? prefixText,
+    TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
+  }) {
+    return CupertinoTextField(
+      controller: controller,
+      focusNode: focusNode,
+      textInputAction: nextFocusNode == null
+          ? TextInputAction.done
+          : TextInputAction.next,
+      onSubmitted: (_) {
+        if (nextFocusNode != null) {
+          nextFocusNode.requestFocus();
+        } else {
+          FocusManager.instance.primaryFocus?.unfocus();
+        }
+      },
+      placeholder: placeholder,
+      keyboardType: keyboardType,
+      inputFormatters: inputFormatters,
+      prefix: prefixText == null
+          ? null
+          : Padding(
+              padding: const EdgeInsets.only(left: 13, right: 8),
+              child: Text(
+                prefixText,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+      placeholderStyle: TextStyle(
+        color: Colors.white.withValues(alpha: 0.45),
+        fontSize: 13.5,
+      ),
+      style: const TextStyle(color: Colors.white, fontSize: 14),
+      padding: const EdgeInsets.all(13),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.24),
+          width: 0.7,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showAccountLinkReview(BuildContext context) async {
+    final currentRepository = repository;
+    if (currentRepository == null) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _PendingAccountLinksSheet(
+        repository: currentRepository,
+      ),
+    );
+  }
+
+  bool _isValidTurkishPhone(String value) {
+    final digits = value.replaceAll(RegExp(r'\D'), '');
+    return digits.length == 10 ||
+        (digits.length == 11 && digits.startsWith('0'));
+  }
+}
+
+class _PendingAccountLinksSheet extends StatefulWidget {
+  const _PendingAccountLinksSheet({required this.repository});
+
+  final PortalRepository repository;
+
+  @override
+  State<_PendingAccountLinksSheet> createState() =>
+      _PendingAccountLinksSheetState();
+}
+
+class _PendingAccountLinksSheetState extends State<_PendingAccountLinksSheet> {
+  List<Map<String, dynamic>> _matches = const [];
+  bool _loading = true;
+  String? _error;
+  String? _linkingAccountId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMatches();
+  }
+
+  Future<void> _loadMatches() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final matches = await widget.repository.loadPendingAccountLinks();
+      if (!mounted) return;
+      setState(() {
+        _matches = matches;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Hesap eÅŸleÅŸmeleri alÄ±namadÄ±: $error';
+      });
+    }
+  }
+
+  Future<void> _link(Map<String, dynamic> match) async {
+    final account = match['account'] as Map<String, dynamic>;
+    final contract = match['contract'] as Map<String, dynamic>;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('HesabÄ± sÃ¶zleÅŸmeye baÄŸla'),
+        content: Text(
+          '${match['phone']} numaralÄ± hesabÄ± ${contract['full_name']} adÄ±na kayÄ±tlÄ± '
+          '${contract['contract_number'] ?? 'bekleyen'} sÃ¶zleÅŸmesine baÄŸlamak Ã¼zeresiniz. '
+          'SMS doÄŸrulamasÄ± kullanÄ±lmadÄ±ÄŸÄ± iÃ§in kiÅŸinin kimliÄŸini ayrÄ±ca kontrol ettiÄŸinizi onaylayÄ±n.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('VazgeÃ§'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('KimliÄŸi kontrol ettim, baÄŸla'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+
+    final accountId = account['id'].toString();
+    setState(() => _linkingAccountId = accountId);
+    try {
+      if (contract['_pending_contract_record'] == true) {
+        await widget.repository.linkPendingContractAccount(
+          pendingContractId: contract['id'].toString(),
+          accountCustomerId: accountId,
+        );
+      } else {
+        await widget.repository.linkCustomerAccount(
+          contractCustomerId: contract['id'].toString(),
+          accountCustomerId: accountId,
+        );
+      }
+      if (!mounted) return;
+      setState(() => _matches.removeWhere(
+        (item) =>
+            (item['account'] as Map<String, dynamic>)['id'] == accountId,
+      ));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hesap sÃ¶zleÅŸmeye baÄŸlandÄ±.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Hesap baÄŸlanamadÄ±: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _linkingAccountId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: MediaQuery.sizeOf(context).height * 0.76,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+        decoration: const BoxDecoration(
+          color: Color(0xFF191817),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: .25),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Bekleyen hesap eÅŸleÅŸmeleri',
+              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'EÅŸleÅŸme numaraya gÃ¶re bulunur. Numara tek baÅŸÄ±na kimlik kanÄ±tÄ± deÄŸildir; her hesabÄ± ayrÄ±ca kontrol edin.',
+              style: TextStyle(color: Colors.white.withValues(alpha: .65), fontSize: 12.5),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(child: Text(_error!, style: const TextStyle(color: Colors.redAccent)))
+                  : _matches.isEmpty
+                  ? Center(
+                      child: Text(
+                        'BaÄŸlanmayÄ± bekleyen hesap bulunamadÄ±.',
+                        style: TextStyle(color: Colors.white.withValues(alpha: .7)),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: _matches.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final match = _matches[index];
+                        final account = match['account'] as Map<String, dynamic>;
+                        final contract = match['contract'] as Map<String, dynamic>;
+                        final isLinking = _linkingAccountId == account['id'].toString();
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: .06),
+                            border: Border.all(color: Colors.white.withValues(alpha: .1)),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('${match['phone']} â€¢ yeni hesap', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 5),
+                              Text('${contract['full_name']} â€¢ ${contract['contract_number']}', style: TextStyle(color: Colors.white.withValues(alpha: .7))),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _linkingAccountId == null ? () => _link(match) : null,
+                                  icon: isLinking
+                                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                                      : const Icon(CupertinoIcons.link),
+                                  label: const Text('KimliÄŸi kontrol ettim, hesabÄ± baÄŸla'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomerFolderManager extends StatefulWidget {
+  const _CustomerFolderManager({
+    required this.repository,
+    required this.customers,
+  });
+
+  final PortalRepository repository;
+  final List<Customer> customers;
+
+  @override
+  State<_CustomerFolderManager> createState() => _CustomerFolderManagerState();
+}
+
+class _CustomerFolderManagerState extends State<_CustomerFolderManager> {
+  late Future<List<Map<String, dynamic>>> _folders = widget.repository
+      .loadCustomerFolders();
+
+  Future<void> _createFolder() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('KlasÃ¶r oluÅŸtur'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'KlasÃ¶r adÄ±'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('VazgeÃ§'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('OluÅŸtur'),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.isEmpty) return;
+    try {
+      await widget.repository.createCustomerFolder(name);
+      if (mounted) {
+        setState(() => _folders = widget.repository.loadCustomerFolders());
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('KlasÃ¶r oluÅŸturulamadÄ±: $error')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(
+    BuildContext context,
+  ) => FutureBuilder<List<Map<String, dynamic>>>(
+    future: _folders,
+    builder: (context, snapshot) {
+      final folders = snapshot.data ?? const [];
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${widget.customers.length} mÃ¼ÅŸteri â€¢ klasÃ¶r ve ada gÃ¶re sÄ±ralÄ±',
+                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 12),
+              ),
+            ),
+            CupertinoButton(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              onPressed: _createFolder,
+              child: const Text(
+                '+ KlasÃ¶r',
+                style: TextStyle(color: Color(0xFF64D2FF)),
+              ),
+            ),
+            if (folders.isNotEmpty)
+              Text(
+                '${folders.length} klasÃ¶r',
+                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 11),
+              ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class _CustomerFolderAssignment extends StatefulWidget {
+  const _CustomerFolderAssignment({
+    required this.repository,
+    required this.customer,
+  });
+  final PortalRepository repository;
+  final Customer customer;
+
+  @override
+  State<_CustomerFolderAssignment> createState() =>
+      _CustomerFolderAssignmentState();
+}
+
+class _CustomerFolderAssignmentState extends State<_CustomerFolderAssignment> {
+  late Future<List<Map<String, dynamic>>> _folders;
+  String? _folderId;
+
+  @override
+  void initState() {
+    super.initState();
+    _folders = widget.repository.loadCustomerFolders();
+    _folderId = widget.customer.folderId;
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: _folders,
+        builder: (context, snapshot) {
+          final folders = snapshot.data ?? const [];
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 6),
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+            );
+          }
+          if (folders.isEmpty) {
+            return CupertinoButton(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              minimumSize: Size.zero,
+              onPressed: () => setState(
+                () => _folders = widget.repository.loadCustomerFolders(),
+              ),
+              child: const Text(
+                'KlasÃ¶rleri yenile',
+                style: TextStyle(color: Color(0xFF64D2FF), fontSize: 11),
+              ),
+            );
+          }
+          return Align(
+            alignment: Alignment.centerLeft,
+            child: DropdownButton<String?>(
+              value: folders.any((folder) => folder['id'] == _folderId)
+                  ? _folderId
                   : null,
               hint: const Text(
                 'KlasÃ¶re ekle',
