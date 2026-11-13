@@ -37,21 +37,15 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _awaitingOtp = false;
   bool _resetPasswordFlow = false;
   bool _resetPasswordReady = false;
-  bool _passwordDotsLatched = false;
 
   @override
   void initState() {
     super.initState();
-    _passwordFocusNode.addListener(_handlePasswordFocusChange);
     _passwordController.addListener(_handlePasswordChange);
     _phoneController.addListener(_handlePhoneChange);
   }
 
-  bool get _isPhoneReadyForPassword =>
-      _normalizePhone(_phoneController.text) != null;
-
-  bool get _showPasswordDotAnimation =>
-      _isRegistering || _resetPasswordReady || _passwordDotsLatched;
+  bool get _showPasswordDotAnimation => !_isPasswordVisible;
   // SMS-based reset stays in the repository for a future verified release,
   // but is intentionally unavailable while SMS OTP is disabled in this MVP.
   bool get _canRequestPasswordReset => false;
@@ -64,24 +58,14 @@ class _AuthScreenState extends State<AuthScreen> {
     if (mounted) setState(() {});
   }
 
-  void _handlePasswordFocusChange() {
-    if (!mounted) return;
-    if (_passwordFocusNode.hasFocus && _isPhoneReadyForPassword) {
-      _passwordDotsLatched = true;
-    }
-    setState(() {});
-  }
-
   @override
   void dispose() {
+    _phoneController.removeListener(_handlePhoneChange);
+    _passwordController.removeListener(_handlePasswordChange);
     _phoneController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
-    _passwordFocusNode
-      ..removeListener(_handlePasswordFocusChange)
-      ..dispose();
-    _phoneController.removeListener(_handlePhoneChange);
-    _passwordController.removeListener(_handlePasswordChange);
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -174,7 +158,6 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() {
             _awaitingOtp = false;
             _resetPasswordReady = true;
-            _passwordDotsLatched = false;
             _passwordController.clear();
           });
           _showMessage('Kod doğrulandı. Yeni parolanızı belirleyin.');
@@ -782,6 +765,15 @@ class _AuthField extends StatelessWidget {
                     child: TextFormField(
                       controller: controller,
                       focusNode: focusNode,
+                      onTapAlwaysCalled: true,
+                      onTap: morphToDots
+                          ? () {
+                              controller.selection = TextSelection.collapsed(
+                                offset: controller.text.length,
+                              );
+                            }
+                          : null,
+                      enableInteractiveSelection: !morphToDots,
                       keyboardType: keyboardType,
                       textInputAction: textInputAction,
                       inputFormatters: inputFormatters,
