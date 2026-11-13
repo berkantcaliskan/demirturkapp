@@ -254,8 +254,13 @@ class _AuthScreenState extends State<AuthScreen> {
       _showMessage(error.message, isError: true);
     } on PostgrestException catch (error) {
       _showMessage(error.message, isError: true);
-    } catch (error) {
-      _showMessage('İşlem tamamlanamadı: $error', isError: true);
+    } catch (_) {
+      _showMessage(
+        _isRegistering
+            ? 'Hesap oluşturulamadı. Kayıt servisi kullanılamıyor; lütfen daha sonra tekrar deneyin.'
+            : 'İşlem tamamlanamadı. Bağlantınızı kontrol edip tekrar deneyin.',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -515,22 +520,13 @@ class _AuthScreenState extends State<AuthScreen> {
                                             ),
                                           ),
                                     enabled: !_awaitingOtp,
-                                    keyboardType:
-                                        _isRegistering || _resetPasswordReady
-                                        ? TextInputType.number
-                                        : TextInputType.visiblePassword,
-                                    inputFormatters:
-                                        _isRegistering || _resetPasswordReady
-                                        ? [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                            LengthLimitingTextInputFormatter(6),
-                                          ]
-                                        : null,
-                                    maxLength:
-                                        _isRegistering || _resetPasswordReady
-                                        ? 6
-                                        : null,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                    maxLength: 6,
                                     validator: (value) {
                                       if (_isRegistering ||
                                           _resetPasswordReady) {
@@ -540,9 +536,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                             ? null
                                             : 'Parola 6 rakamdan oluşmalı.';
                                       }
-                                      return value == null || value.isEmpty
-                                          ? 'Parola alanını doldurun.'
-                                          : null;
+                                      return value != null &&
+                                              RegExp(r'^\d{6}$').hasMatch(value)
+                                          ? null
+                                          : 'Parola 6 rakamdan oluşmalı.';
                                     },
                                   ),
                                   if (_canRequestPasswordReset &&
@@ -711,6 +708,7 @@ class _AuthField extends StatelessWidget {
     required this.foreground,
     required this.muted,
     this.keyboardType,
+    this.textInputAction,
     this.inputFormatters,
     this.maxLength,
     this.obscureText = false,
@@ -732,6 +730,7 @@ class _AuthField extends StatelessWidget {
   final Color foreground;
   final Color muted;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
   final bool obscureText;
@@ -766,7 +765,9 @@ class _AuthField extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 880),
               curve: Curves.easeInOutCubic,
-              width: morphToDots ? 142 : constraints.maxWidth,
+              // Keep the focused input geometry stable while the dot view is
+              // shown; IMEs can otherwise mishandle backspace during resize.
+              width: constraints.maxWidth,
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(morphToDots ? 28 : 18),
@@ -782,10 +783,13 @@ class _AuthField extends StatelessWidget {
                       controller: controller,
                       focusNode: focusNode,
                       keyboardType: keyboardType,
+                      textInputAction: textInputAction,
                       inputFormatters: inputFormatters,
                       maxLength: maxLength,
                       obscureText: obscureText,
                       obscuringCharacter: obscuringCharacter,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       enabled: enabled,
                       validator: validator,
                       style: TextStyle(
