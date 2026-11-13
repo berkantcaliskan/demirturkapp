@@ -39,9 +39,13 @@ function normalizePhone(value: string): string | null {
   return digits.length === 10 && digits.startsWith('5') ? `+90${digits}` : null;
 }
 
-function getStaffPhones(): Set<string> | null {
+async function getStaffPhones(admin: ReturnType<typeof createClient>): Promise<Set<string> | null> {
   const configured = Deno.env.get('STAFF_PHONE_ROSTER');
-  if (!configured) return null;
+  if (!configured) {
+    const { data, error } = await admin.from('staff_account_roster').select('phone');
+    if (error || !data?.length) return null;
+    return new Set(data.map((row) => row.phone as string));
+  }
   try {
     const rows = JSON.parse(configured) as Array<{ phone?: string }>;
     return new Set(rows.map((row) => normalizePhone(row.phone ?? '')).filter(
@@ -86,7 +90,10 @@ Deno.serve(async (request) => {
   if (!phone || !/^\d{6}$/.test(password)) {
     return respond({ error: 'Telefon numarası veya parola biçimi geçersiz.' }, 400);
   }
-  const staffPhones = getStaffPhones();
+  const admin = createClient(url, serverKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const staffPhones = await getStaffPhones(admin);
   if (!staffPhones) {
     return respond({ error: 'Kayıt servisi şu anda kullanılamıyor.' }, 503);
   }
@@ -102,9 +109,6 @@ Deno.serve(async (request) => {
     sha256(clientIp),
   ]);
 
-  const admin = createClient(url, serverKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
   const { data: reservedStaff, error: rosterError } = await admin
     .from('profiles')
     .select('id')

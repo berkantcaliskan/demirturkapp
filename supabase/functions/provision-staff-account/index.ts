@@ -44,9 +44,13 @@ function normalizePhone(value: string): string | null {
   return digits.length === 10 && digits.startsWith('5') ? `+90${digits}` : null;
 }
 
-function isRosterPhone(name: string, phone: string): boolean {
+async function isRosterPhone(admin: ReturnType<typeof createClient>, name: string, phone: string): Promise<boolean> {
   const configured = Deno.env.get('STAFF_PHONE_ROSTER');
-  if (!configured) return false;
+  if (!configured) {
+    const { data, error } = await admin.from('staff_account_roster')
+      .select('name').eq('name', name).eq('phone', phone).maybeSingle();
+    return !error && data !== null;
+  }
   try {
     const rows = JSON.parse(configured) as Array<{ name?: string; phone?: string }>;
     return rows.some((row) =>
@@ -71,15 +75,24 @@ Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return respond({ error: 'Method not allowed' }, 405);
 
-  const expectedSecret = Deno.env.get('STAFF_PROVISIONING_SECRET') ?? '';
-  const suppliedSecret = request.headers.get('x-staff-provisioning-key') ?? '';
-  if (expectedSecret.length < 32 || !sameSecret(suppliedSecret, expectedSecret)) {
-    return respond({ error: 'Unauthorized' }, 401);
-  }
-
   const url = Deno.env.get('SUPABASE_URL');
   const serverKey = getServerKey();
   if (!url || !serverKey) return respond({ error: 'Provisioning service is not configured' }, 503);
+  const admin = createClient(url, serverKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const expectedSecret = Deno.env.get('STAFF_PROVISIONING_SECRET') ?? '';
+  const suppliedSecret = request.headers.get('x-staff-provisioning-key') ?? '';
+  let permitted = expectedSecret.length >= 32 && sameSecret(suppliedSecret, expectedSecret);
+  if (!permitted && suppliedSecret.length >= 32) {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(suppliedSecret));
+    const keyHash = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const { data, error } = await admin.from('staff_provisioning_access')
+      .select('key_hash').eq('key_hash', keyHash)
+      .gt('expires_at', new Date().toISOString()).maybeSingle();
+    permitted = !error && data !== null;
+  }
+  if (!permitted) return respond({ error: 'Unauthorized' }, 401);
 
   let payload: Record<string, unknown>;
   try {
@@ -95,13 +108,10 @@ Deno.serve(async (request) => {
   if (!employee || !phone || !/^\d{6}$/.test(password)) {
     return respond({ error: 'Personel adı, telefon numarası veya parola biçimi geçersiz.' }, 400);
   }
-  if (!isRosterPhone(rosterKey, phone)) {
+  if (!await isRosterPhone(admin, rosterKey, phone)) {
     return respond({ error: 'Bu ad ve numara personel listesiyle eşleşmiyor.' }, 403);
   }
 
-  const admin = createClient(url, serverKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
   let user: User | null = null;
   for (let page = 1; ; page++) {
     const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });

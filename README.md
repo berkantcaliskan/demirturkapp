@@ -24,6 +24,7 @@ Apply the migrations in order:
 - `supabase/migrations/202611130011_secure_customer_ticket_creation.sql`
 - `supabase/migrations/202611130012_staff_roster_and_assignment_sync.sql`
 - `supabase/migrations/202611130013_username_signup_and_unlinked_customer_accounts.sql`
+- `supabase/migrations/202611130014_server_only_staff_roster.sql`
 
 Migration 2 creates the **private** Storage bucket named `payment-receipts`
 with a 10 MB size limit and PDF/JPEG/PNG MIME allowlist. Receipt objects must
@@ -88,10 +89,13 @@ Staff accounts are provisioned through the server-only
 `provision-staff-account` Edge Function. It accepts only the six names and
 roles in the roster above, marks the Auth phone usable without sending SMS,
 sets the profile role and contact number, and lets the database assign the
-unique staff ID. Protect the endpoint with a random `STAFF_PROVISIONING_SECRET`
-of at least 32 characters. Set `STAFF_PHONE_ROSTER` as a server-side function
-secret containing the six name/phone pairs; both Edge Functions use it to
-reserve the employee usernames and reject mismatched provisioning requests.
+unique staff ID. Reserve the name/phone/role pairs in the service-only
+`staff_account_roster` table. `STAFF_PHONE_ROSTER` remains an optional server
+secret override. Provisioning requires either a random
+`STAFF_PROVISIONING_SECRET` of at least 32 characters or a short-lived
+SHA-256 key hash in the service-only `staff_provisioning_access` table. Remove
+temporary access immediately after provisioning. Both Edge Functions use the
+roster to reserve employee usernames and reject mismatched requests.
 Keep the real phone values and provisioning secret out of this public source
 repository and the mobile app.
 Password reset by SMS is not available in this release.
