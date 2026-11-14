@@ -163,7 +163,8 @@ create function public.validate_contract_auth_link()
 returns trigger language plpgsql security definer set search_path = '' as $$
 begin
   if new.auth_user_id is null or new.contract_number is null then return new; end if;
-  if tg_op = 'UPDATE' and old.auth_user_id is not distinct from new.auth_user_id then
+  if tg_op = 'UPDATE' and old.auth_user_id is not distinct from new.auth_user_id
+    and old.contract_number is not distinct from new.contract_number then
     return new;
   end if;
   if not exists (
@@ -180,7 +181,7 @@ end;
 $$;
 
 create trigger customer_validate_contract_auth_link
-  before insert or update of auth_user_id on public.customers
+  before insert or update of auth_user_id, contract_number on public.customers
   for each row execute function public.validate_contract_auth_link();
 revoke execute on function public.validate_contract_auth_link() from public, anon, authenticated;
 
@@ -211,5 +212,168 @@ create index if not exists payment_submissions_receipt_path_idx
   on public.payment_submissions(receipt_object_path);
 create index if not exists ticket_messages_attachment_path_idx
   on public.ticket_messages(attachment_object_path) where attachment_object_path is not null;
+
+-- Disambiguate the contract counter column from the PL/pgSQL variable.
+create or replace function public.create_contract_record(
+  p_full_name text,
+  p_national_or_tax_id text,
+  p_phone text,
+  p_assigned_advisor_id uuid,
+  p_contract_date date,
+  p_folder_id uuid default null,
+  p_contract_storage_path text default null,
+  p_contract_file_name text default null,
+  p_contract_content_type text default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  digits text;
+  normalized_phone text;
+  v_contract_year integer;
+  serial_number integer;
+  generated_contract_number text;
+  matching_customers integer;
+  target_customer_id uuid;
+  extension text;
+begin
+  if not (select public.can_manage_finance()) then
+    raise exception 'Only management or accounting can create contracts';
+  end if;
+  if nullif(btrim(p_full_name), '') is null or p_contract_date is null then
+    raise exception 'Customer name and contract date are required';
+  end if;
+  if not exists (select 1 from public.profiles p
+      where p.id = p_assigned_advisor_id and p.staff_role = 'sales_advisor') then
+    raise exception 'A valid sales advisor must be assigned';
+  end if;
+
+  digits := pg_catalog.regexp_replace(coalesce(p_phone, ''), '[^0-9]', '', 'g');
+  if length(digits) = 10 and left(digits, 1) = '5' then
+    normalized_phone := '+90' || digits;
+  elsif length(digits) = 11 and left(digits, 1) = '0' and substr(digits, 2, 1) = '5' then
+    normalized_phone := '+90' || substr(digits, 2);
+  elsif length(digits) = 12 and left(digits, 2) = '90' and substr(digits, 3, 1) = '5' then
+    normalized_phone := '+' || digits;
+  else
+    raise exception 'Phone must be a valid Turkish mobile number';
+  end if;
+
+  if p_contract_storage_path is not null then
+    extension := lower(split_part(coalesce(p_contract_file_name, ''), '.', -1));
+    if extension not in ('pdf', 'doc', 'docx')
+      or p_contract_content_type not in ('application/pdf', 'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document') then
+      raise exception 'Contract file must be a PDF or Word document';
+    end if;
+    if not exists (select 1 from storage.objects o
+      where o.bucket_id = 'customer-contracts' and o.name = p_contract_storage_path
+        and split_part(o.name, '/', 1) = (select auth.uid())::text) then
+      raise exception 'The private contract upload was not found for this staff account';
+    end if;
+  elsif p_contract_file_name is not null or p_contract_content_type is not null then
+    raise exception 'Incomplete contract file information';
+  end if;
+
+  v_contract_year := extract(year from p_contract_date)::integer;
+  insert into public.customer_contract_counters as counters (contract_year, last_number)
+    values (v_contract_year, 1)
+    on conflict (contract_year) do update set last_number = counters.last_number + 1
+    returning last_number into serial_number;
+  if serial_number > 999999 then
+    raise exception 'The contract sequence for % is full', v_contract_year;
+  end if;
+  generated_contract_number := 'S/' || v_contract_year::text || lpad(serial_number::text, 6, '0');
+
+  select count(*) into matching_customers from public.customers c
+    where c.auth_user_id is null and c.contract_number is null
+      and lower(btrim(c.full_name)) = lower(btrim(p_full_name))
+      and public.normalize_tr_phone(c.phone) = public.normalize_tr_phone(normalized_phone);
+  if matching_customers = 1 then
+    select c.id into target_customer_id from public.customers c
+      where c.auth_user_id is null and c.contract_number is null
+        and lower(btrim(c.full_name)) = lower(btrim(p_full_name))
+        and public.normalize_tr_phone(c.phone) = public.normalize_tr_phone(normalized_phone)
+      for update;
+    update public.customers set
+      national_or_tax_id = coalesce(nullif(btrim(p_national_or_tax_id), ''), national_or_tax_id),
+      contract_number = generated_contract_number, contract_status = 'approved',
+      assigned_advisor_id = p_assigned_advisor_id, folder_id = p_folder_id
+      where id = target_customer_id and auth_user_id is null;
+    if p_contract_storage_path is not null then
+      insert into public.customer_contract_documents (
+        customer_id, storage_path, file_name, content_type, uploaded_by
+      ) values (target_customer_id, p_contract_storage_path, p_contract_file_name,
+        p_contract_content_type, (select auth.uid()));
+    end if;
+    return target_customer_id;
+  end if;
+
+  insert into public.pending_contract_records (
+    full_name, national_or_tax_id, phone, contract_number, contract_date,
+    assigned_advisor_id, folder_id, storage_path, file_name, content_type, uploaded_by
+  ) values (
+    btrim(p_full_name), nullif(btrim(p_national_or_tax_id), ''), normalized_phone,
+    generated_contract_number, p_contract_date, p_assigned_advisor_id, p_folder_id,
+    p_contract_storage_path, p_contract_file_name, p_contract_content_type, (select auth.uid())
+  ) returning id into target_customer_id;
+  return target_customer_id;
+end;
+$$;
+
+-- Attach a pending contract to the existing account row. Keeping its ID also
+-- keeps notes, receipts, messages, and their existing storage paths intact.
+create or replace function public.link_pending_contract_account(
+  p_pending_contract_id uuid,
+  p_account_customer_id uuid
+)
+returns uuid language plpgsql security definer set search_path = '' as $$
+declare
+  pending_contract public.pending_contract_records%rowtype;
+  account_customer public.customers%rowtype;
+begin
+  if not (select public.can_manage_finance()) then
+    raise exception 'Only management or accounting can link customer accounts';
+  end if;
+
+  select * into pending_contract from public.pending_contract_records
+    where id = p_pending_contract_id for update;
+  select * into account_customer from public.customers
+    where id = p_account_customer_id for update;
+  if pending_contract.id is null or account_customer.id is null
+    or account_customer.auth_user_id is null or account_customer.contract_number is not null then
+    raise exception 'The pending contract or account record is missing';
+  end if;
+  if public.normalize_tr_phone(pending_contract.phone)
+    is distinct from public.normalize_tr_phone(account_customer.phone) then
+    raise exception 'The contract and account phone numbers do not match';
+  end if;
+  if exists (select 1 from public.profiles p where p.id = account_customer.auth_user_id
+    and (p.role = 'admin'::public.app_role or p.staff_role is not null)) then
+    raise exception 'A staff account cannot be linked as a customer';
+  end if;
+
+  update public.customers set full_name = pending_contract.full_name,
+    national_or_tax_id = coalesce(pending_contract.national_or_tax_id, national_or_tax_id),
+    phone = pending_contract.phone, contract_number = pending_contract.contract_number,
+    contract_status = 'approved', assigned_advisor_id = pending_contract.assigned_advisor_id,
+    folder_id = pending_contract.folder_id
+    where id = account_customer.id;
+
+  if pending_contract.storage_path is not null then
+    insert into public.customer_contract_documents (
+      customer_id, storage_path, file_name, content_type, uploaded_by
+    ) values (
+      account_customer.id, pending_contract.storage_path, pending_contract.file_name,
+      pending_contract.content_type, pending_contract.uploaded_by
+    );
+  end if;
+  delete from public.pending_contract_records where id = pending_contract.id;
+  return account_customer.id;
+end;
+$$;
 
 notify pgrst, 'reload schema';
