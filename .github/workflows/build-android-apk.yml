@@ -33,13 +33,13 @@ jobs:
       - name: Fetch Dart packages
         run: flutter pub get
 
-      - name: Build version 10 APK
-        run: flutter build apk --release --build-name=1.0.10 --build-number=10
+      - name: Build Android APK
+        run: flutter build apk --release
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: demirturkapp-v10-apk
+          name: demirturkapp-v11-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           if-no-files-found: error
           retention-days: 14

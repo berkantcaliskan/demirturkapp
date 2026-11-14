@@ -25,6 +25,12 @@ Apply the migrations in order:
 - `supabase/migrations/202611130012_staff_roster_and_assignment_sync.sql`
 - `supabase/migrations/202611130013_username_signup_and_unlinked_customer_accounts.sql`
 - `supabase/migrations/202611130014_server_only_staff_roster.sql`
+- `supabase/migrations/202611140015_harden_portal_access.sql`
+
+The last migration requires mobile builds that use `create_contract_record`
+and `get_or_create_customer_ticket`. It removes the legacy contract RPC and
+direct client writes to support tickets. Update any older app installations
+before rolling out these database permissions.
 
 Migration 2 creates the **private** Storage bucket named `payment-receipts`
 with a 10 MB size limit and PDF/JPEG/PNG MIME allowlist. Receipt objects must

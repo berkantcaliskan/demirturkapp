@@ -16,6 +16,7 @@ void showIbanSheet(BuildContext context, AppState appState) {
       final textPrimary = AppGlass.textPrimary(ctx);
       final textSecondary = AppGlass.textSecondary(ctx);
       final textMuted = AppGlass.textMuted(ctx);
+      final bankAccounts = appState.bankAccounts;
 
       return IosGlassSheet(
         maxHeightFactor: 0.85,
@@ -68,10 +69,11 @@ void showIbanSheet(BuildContext context, AppState appState) {
                             color: textPrimary,
                           ),
                         ),
-                        Text(
-                          'FAST / EFT / Havale açıklamasına Senet No yazınız',
-                          style: TextStyle(fontSize: 12, color: textMuted),
-                        ),
+                        if (bankAccounts.isNotEmpty)
+                          Text(
+                            'FAST / EFT / Havale açıklamasına Senet No yazınız',
+                            style: TextStyle(fontSize: 12, color: textMuted),
+                          ),
                       ],
                     ),
                   ),
@@ -94,62 +96,71 @@ void showIbanSheet(BuildContext context, AppState appState) {
                 padding: const EdgeInsets.all(16),
                 shrinkWrap: true,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(13),
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: AppGlass.subtleSurface(ctx),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppGlass.dividerColor(ctx),
-                        width: 0.7,
+                  if (bankAccounts.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Text(
+                        'Banka hesabı bilgisi henüz eklenmemiş. Ödeme bilgileri için muhasebeyle iletişime geçin.',
+                        style: TextStyle(color: textSecondary),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          CupertinoIcons.info_circle_fill,
-                          color: textSecondary,
-                          size: 20,
+                  if (bankAccounts.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(13),
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: AppGlass.subtleSurface(ctx),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppGlass.dividerColor(ctx),
+                          width: 0.7,
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Alıcı Unvanı: ${appState.bankAccounts.first.accountHolder}',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            CupertinoIcons.info_circle_fill,
+                            color: textSecondary,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Alıcı Unvanı: ${bankAccounts.first.accountHolder}',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                                color: textPrimary,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IosGlassButton(
-                          isSecondaryGlass: true,
-                          icon: CupertinoIcons.doc_on_doc_fill,
-                          label: 'Kopyala',
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 11,
-                            vertical: 7,
+                          const SizedBox(width: 8),
+                          IosGlassButton(
+                            isSecondaryGlass: true,
+                            icon: CupertinoIcons.doc_on_doc_fill,
+                            label: 'Kopyala',
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 7,
+                            ),
+                            onTap: () {
+                              Clipboard.setData(
+                                ClipboardData(
+                                  text: bankAccounts.first.accountHolder,
+                                ),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Şirket unvanı kopyalandı!'),
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            },
                           ),
-                          onTap: () {
-                            Clipboard.setData(
-                              ClipboardData(
-                                text: appState.bankAccounts.first.accountHolder,
-                              ),
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Şirket unvanı kopyalandı!'),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  ...appState.bankAccounts.map((bank) {
+                  ...bankAccounts.map((bank) {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.all(16),
