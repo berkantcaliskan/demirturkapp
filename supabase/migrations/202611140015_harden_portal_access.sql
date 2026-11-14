@@ -136,6 +136,18 @@ create policy "receipt_owner_delete_unsubmitted" on storage.objects
       where p.receipt_object_path = storage.objects.name)
   );
 
+-- Existing-contract links retain uploaded object keys. A linked receipt
+-- follows the authorized submission row even when the customer ID changed.
+alter policy "receipt_owner_or_admin_read" on storage.objects using (
+  bucket_id = 'payment-receipts' and (
+    (select public.can_manage_finance())
+    or (storage.foldername(name))[1] = (select public.current_customer_id())::text
+    or exists (select 1 from public.payment_submissions p
+      where p.receipt_object_path = storage.objects.name
+        and p.customer_id = (select public.current_customer_id()))
+  )
+);
+
 -- Match a linked attachment to both its message's ticket and its sender.
 -- The read policy also protects objects referenced before this migration.
 create or replace function public.validate_ticket_attachment()
