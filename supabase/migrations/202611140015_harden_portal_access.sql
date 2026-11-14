@@ -30,6 +30,14 @@ grant update (is_read) on public.staff_notifications to authenticated;
 drop policy if exists "tickets_customer_create_own" on public.support_tickets;
 drop policy if exists "tickets_staff_update_scoped" on public.support_tickets;
 
+-- Advisors get their assigned customer records through customers. They don't
+-- need a directory of unrelated profiles to operate the inbox or workspace.
+alter policy "profiles_read_private_staff_directory" on public.profiles using (
+  id = (select auth.uid()) or (select public.can_manage_finance())
+  or exists (select 1 from public.customers c
+    where c.auth_user_id = (select auth.uid()) and c.assigned_advisor_id = profiles.id)
+);
+
 -- RLS only applies to row operations, so remove default table privileges for
 -- operations that the client should never perform, including TRUNCATE.
 revoke truncate, references, trigger, maintain on public.profiles, public.customers,
