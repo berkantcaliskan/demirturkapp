@@ -33,6 +33,7 @@ jobs:
 
   prepare:
     needs: checks
+    environment: stores
     runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.config.outputs.version }}
@@ -63,6 +64,7 @@ jobs:
 
   android:
     name: Android build and Play delivery
+    environment: stores
     needs: prepare
     if: needs.prepare.outputs.android_ready == 'true'
     runs-on: ubuntu-24.04
@@ -125,6 +127,7 @@ jobs:
 
   ios:
     name: iOS build and App Store delivery
+    environment: stores
     needs: prepare
     if: needs.prepare.outputs.ios_ready == 'true'
     runs-on: macos-26

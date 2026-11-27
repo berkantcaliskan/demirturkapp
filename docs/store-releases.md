@@ -31,7 +31,11 @@ delay availability after a successful upload.
 
 ## One-time connections
 
-Set these in repository **Settings → Secrets and variables → Actions → Secrets**.
+Set these in repository **Settings → Environments → stores → Environment secrets**.
+The `stores` environment allows deployments only from the protected `stable`
+branch; development and pull-request jobs cannot read these keys. No manual
+approval gate is configured, so eligible releases remain automatic. Optional
+non-secret variables below are repository Actions variables.
 Never commit keys or send private key values in chat. Grant credentials access
 only to this application and the release operations they need.
 
@@ -69,7 +73,9 @@ Firebase push sender credential is unrelated and must not be reused.
 
 Signing material is decoded only into temporary runner storage and removed in
 an always-run cleanup step. It is never included in build artifacts. Workflow
-permissions are read-only and third-party actions are pinned to commit IDs.
+permissions are read-only and third-party actions in the automated pipeline are
+pinned to commit IDs. The older manual APK workflow also uses the restricted
+`stores` environment and must be run on `stable`.
 
 ## Version numbers and retries
 
