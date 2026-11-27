@@ -1,9 +1,9 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
+import '../../widgets/contract_document_button.dart';
 import '../../widgets/website_blurred_background.dart';
 
 class CustomerProjectScreen extends StatelessWidget {
@@ -260,61 +260,14 @@ class CustomerProjectScreen extends StatelessWidget {
             ],
           ),
         ),
-        if (customer.contractDocumentPath != null) ...[
+        if (customer.contractDocumentPath != null && repository != null) ...[
           const SizedBox(height: 14),
           GlassCard(
             borderRadius: 20,
-            padding: EdgeInsets.zero,
-            child: CupertinoButton(
-              padding: const EdgeInsets.all(16),
-              onPressed: repository == null
-                  ? null
-                  : () async {
-                      try {
-                        final url = await repository!.getContractDocumentUrl(
-                          customer.id,
-                        );
-                        await launchUrl(
-                          url,
-                          mode: LaunchMode.externalApplication,
-                        );
-                      } catch (error) {
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Sözleşme açılamadı: $error'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-              child: Row(
-                children: [
-                  const Icon(
-                    CupertinoIcons.doc_text_fill,
-                    color: Color(0xFFE11D48),
-                    size: 20,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      customer.contractDocumentName ?? 'Sözleşme dosyanız',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppGlass.textPrimary(context),
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    CupertinoIcons.arrow_up_right_square,
-                    color: AppGlass.textMuted(context),
-                    size: 18,
-                  ),
-                ],
-              ),
+            child: ContractDocumentButton(
+              repository: repository!,
+              customerId: customer.id,
+              label: customer.contractDocumentName ?? 'Sözleşmeyi gör',
             ),
           ),
         ],

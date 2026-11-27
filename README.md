@@ -2,6 +2,43 @@
 
 Flutter customer and administration portal for Android and iOS.
 
+## V15 branch and Xcode
+
+Branch `codex/v15-xcode` includes the V14 features and the current V15
+hardening work, with version `1.0.15+15`. Staff password and MFA changes remain
+deferred. Flutter analysis and 11 widget/unit tests pass on Windows; an iOS
+native build has not yet been verified on a Mac.
+
+On a Mac with Flutter 3.50.0, Xcode and the iOS simulator installed:
+
+```sh
+git clone --branch codex/v15-xcode --single-branch https://github.com/berkantcaliskan/demirturkapp.git
+cd demirturkapp
+bash scripts/open-ios.sh
+```
+
+The script resolves Flutter dependencies, generates the local Swift Package
+Manager configuration and opens `ios/Runner.xcworkspace`. If Flutter requests
+CocoaPods for a plugin fallback, install CocoaPods and rerun the script. In
+Xcode choose the `Runner` scheme and a simulator. For a physical iPhone,
+select the company's Apple development team under Signing & Capabilities.
+The current bundle ID is `com.sirket.senettakip.senetTakip`, deployment target
+iOS 15.0. Keychain entitlements are configured for all Runner build modes.
+
+Android Firebase configuration is present. iOS push still needs its own
+Firebase app registration, APNs credentials and signing capability. Until
+that platform setup is completed, the app continues without iOS push.
+
+The pending migration `20261122125818_harden_portal_runtime.sql` and updated
+registration functions are source changes, **not deployed by creating this
+branch**. Before applying that migration to an existing backend, first deploy
+the updated `register-phone-account` and `provision-staff-account` functions;
+they supply the server-only creation marker required by the new signup gate.
+Then apply the migration and validate registration/contract approval before
+distributing V15. Do not reapply historical migrations blindly on the live
+project. Production Android signing also requires the configured company key;
+the private key and its password are excluded from this repository.
+
 ## Backend
 
 Supabase provides Auth, PostgreSQL, RLS, Realtime, Edge Functions and private
@@ -20,6 +57,17 @@ Apply the migrations in order:
 - `supabase/migrations/202611110007_yearly_contract_numbers.sql`
 - `supabase/migrations/202611110008_role_based_staff_ids.sql`
 - `supabase/migrations/202611110009_private_customer_contract_documents.sql`
+- `supabase/migrations/202611120010_contract_first_and_customer_matching.sql`
+- `supabase/migrations/202611130011_secure_customer_ticket_creation.sql`
+- `supabase/migrations/202611130012_staff_roster_and_assignment_sync.sql`
+- `supabase/migrations/202611130013_username_signup_and_unlinked_customer_accounts.sql`
+- `supabase/migrations/202611130014_server_only_staff_roster.sql`
+- `supabase/migrations/202611140015_harden_portal_access.sql`
+
+The last migration requires mobile builds that use `create_contract_record`
+and `get_or_create_customer_ticket`. It removes the legacy contract RPC and
+direct client writes to support tickets. Update any older app installations
+before rolling out these database permissions.
 
 Migration 2 creates the **private** Storage bucket named `payment-receipts`
 with a 10 MB size limit and PDF/JPEG/PNG MIME allowlist. Receipt objects must
@@ -38,66 +86,104 @@ Contracts use the database-issued format `S/{YYYY}{six-digit sequence}`,
 such as `S/2026000001`. The sequence is atomic and restarts for each contract
 year.
 
-After creating each staff login in Supabase Auth, promote it from the SQL
-Editor (replace the phone with the Auth user's confirmed phone):
+The supported staff roster is:
 
-```sql
-update public.profiles p
-set staff_role = 'sales_advisor' -- accounting | management
-from auth.users u
-where p.id = u.id and u.phone = '+905xxxxxxxxx';
-```
+- Sales advisors (`sales_advisor`): Ertuğrul, Levent, Hazal
+- Accounting (`accounting`): Özlem
+- Management (`management`): Murat, Berkant
 
-Assign existing customer records to an advisor by setting
-`customers.assigned_advisor_id` to that advisor's `profiles.id`. For new
-records, select the advisor in the management customer form. Customers can
+Staff IDs are allocated automatically when the profile receives its staff
+role. Names are transliterated and IDs are unique, for example `SD202611/ERT`,
+`SD202611/LEV`, `SD202611/HAZ`, `M202611/OZL`, `Y202611/MUR` and
+`Y202611/BER` for accounts provisioned in November 2026. Once assigned, an ID
+stays the same if the employee's name or role changes. The app has staff login
+only; staff registration is not available in the customer-facing UI.
+
+Do not expose staff registration in the app. Create each staff account through
+the protected `provision-staff-account` Edge Function described below; it
+assigns only the employee's fixed role and returns the generated staff ID.
+
+For new customer records, select an advisor in the management customer form.
+The database verifies that the selected profile is a sales advisor and
+automatically routes open advisor conversations to the assigned advisor,
+including when an existing assignment changes. Customers can
 sign in without a contract; they see a pending-contract state until an
 authorized operator attaches or approves their record. Sales advisors do not
 see promissory notes. All staff can organize customers into persistent folders.
 
-## Phone authentication
+## Phone-number usernames
 
-The live project currently has Phone enabled, `phone_autoconfirm=false`, and
-Twilio Verify selected. This app checks that setting before customer signup
-and does not send an OTP if confirmation would trigger a paid SMS. Do not enable
-phone auto-confirm until customer-to-contract linking is changed to a trusted
-manual claim flow: automatically trusting an unverified phone could expose a
-customer's private contract. The password reset SMS flow is dormant in this
-release.
+Customers create an account with only a Turkish mobile number and a six-digit
+password. The number is normalized to `+90XXXXXXXXXX`, so a leading `0`, a
+`+90` prefix, spaces and punctuation do not change the username. Registration
+uses the `register-phone-account` Edge Function and does not send an SMS. The
+Supabase Auth session remains in place behind the scenes because database RLS
+uses that session to scope customer data; the service key is only used by the
+Edge Function and is never included in the APK.
+
+An unverified username phone is not proof that the person owns a preloaded
+contract. New accounts therefore receive a pending customer record and do not
+automatically claim an existing contract by phone/name matching. Management
+must confirm the person's identity before linking the account to an existing
+contract. Keep this restriction unless a separate trusted proof-of-ownership
+step is added.
+
+Staff accounts are provisioned through the server-only
+`provision-staff-account` Edge Function. It accepts only the six names and
+roles in the roster above, marks the Auth phone usable without sending SMS,
+sets the profile role and contact number, and lets the database assign the
+unique staff ID. Reserve the name/phone/role pairs in the service-only
+`staff_account_roster` table. `STAFF_PHONE_ROSTER` remains an optional server
+secret override. Provisioning requires either a random
+`STAFF_PROVISIONING_SECRET` of at least 32 characters or a short-lived
+SHA-256 key hash in the service-only `staff_provisioning_access` table. Remove
+temporary access immediately after provisioning. Both Edge Functions use the
+roster to reserve employee usernames and reject mismatched requests.
+Keep the real phone values and provisioning secret out of this public source
+repository and the mobile app.
+Password reset by SMS is not available in this release.
 
 ## In-app and push notifications
 
-The app inbox reads persistent `notifications` rows and subscribes to Supabase
-Realtime. Payment receipt submissions/reviews and support chat messages create
-database notifications. Each notification creates a durable `push_outbox` row.
-The `send-push` Edge Function sends FCM HTTP v1 notifications to registered
-Android, iOS and web devices and removes invalid tokens.
+The customer inbox uses `notifications`, and the staff inbox uses
+`staff_notifications`. Both subscribe to Supabase Realtime. Messages, receipt
+reviews and contract approvals enqueue FCM notifications in `push_outbox`.
+Foreground notifications use the `demirturk_updates` Android channel. Tapping
+a notification opens its conversation, payments or contracts screen.
 
-Create a Firebase project, register each platform, enable Cloud Messaging and
-configure the iOS APNs Authentication Key. In Xcode enable Push Notifications
-and Background Modes > Remote notifications. For web, create a Web Push
-certificate and set its VAPID key. Supply the public Firebase client config at
-build time using `FIREBASE_API_KEY`, `FIREBASE_APP_ID`, `FIREBASE_SENDER_ID`,
-`FIREBASE_PROJECT_ID`, `FIREBASE_IOS_BUNDLE_ID` and `FIREBASE_WEB_VAPID_KEY`.
-Web deployments also need a `firebase-messaging-sw.js` service worker matching
-the same Firebase project config; replace its `YOUR_FIREBASE_*` values before
-deploying the web build.
+Firebase project `demirturk-mobil-4954e` supplies the public Android and web
+configuration in `backend_config.dart`. Build defines can override those values.
+iOS deployment also requires its own Firebase app registration, APNs key and
+Xcode Push Notifications capability. Web push requires a Web Push certificate
+and `FIREBASE_WEB_VAPID_KEY`.
 
-Deploy the function and configure the Supabase webhook:
+Migration `20261122110114_push_delivery_and_payment_reminders.sql` installs the
+queue, device registration RPC, restricted worker functions and scheduled jobs.
+Payment reminders run daily at 10.00 Europe/Istanbul, selecting each note's
+`due_date` for two days before, the due date and two days after. Paid notes and
+submitted receipts awaiting review are excluded. Event keys suppress duplicate
+reminders. The worker checks payment state again before sending.
 
-```powershell
-supabase secrets set PUSH_WEBHOOK_SECRET=<long-random-secret>
-supabase secrets set FCM_SERVICE_ACCOUNT_JSON='<service-account-json>'
-supabase functions deploy send-push
-```
+The migration creates `portal_push_endpoint` and `portal_push_webhook_secret`
+in Supabase Vault. Store the FCM sender service-account JSON in the separate
+Vault secret `portal_fcm_service_account`. Use the Firebase Cloud Messaging API
+Admin role on the Firebase project for this service account. Private credentials
+belong in Vault and are accessed through a service-role-only function.
 
-Supabase supplies `SUPABASE_URL` and `SUPABASE_SECRET_KEYS` to the function.
-The function reads the platform-managed default secret key server-side and
-falls back to the legacy `SUPABASE_SERVICE_ROLE_KEY` only for older projects.
-Never paste a secret key into this repository or Flutter configuration.
-In Database > Webhooks create an INSERT webhook on `public.push_outbox`, target
-the deployed `send-push` function, and add the header
-`x-webhook-secret: <same-long-random-secret>`.
+The live Android sender was configured and validated on 2026-11-22 using
+`demirturk-push-sender@demirturk-mobil-4954e.iam.gserviceaccount.com` with that
+FCM-only role. Its uploaded certificate expires on 2028-11-22; rotate the key
+and update the Vault secret before then. The live worker and FCM validation
+requests both returned HTTP 200. Delivery to a physical device still requires
+installing V14, signing in, granting notification permission and a delivery test.
+
+Deploy `supabase/functions/send-push/index.ts` as `send-push`, with JWT checking
+disabled because the worker authenticates its webhook secret in its function
+body. Supabase supplies its server key to the worker. Database inserts wake the
+worker through pg_net, and a cron job retries pending work every minute. A lease
+protects concurrent claims, successful device deliveries are recorded separately,
+and notifications expire after 24 hours. Transient failures use backoff and
+invalid device tokens are removed.
 
 ## Local build configuration
 
@@ -134,24 +220,13 @@ admin data repositories, customer project/notes views, payment submission and
 review, receipt upload, persistent preferences, support messaging, and push
 device registration. Staff accounts and `profiles.staff_role` values are
 provisioned in Supabase; selecting a staff role in the app never grants access.
-A verified customer
-phone is linked automatically only when exactly one unlinked contract has that
-phone number.
+Phone numbers are login identifiers without SMS verification. Contract access
+is linked by authorized staff after an independent identity check; matching a
+phone number alone does not grant access to an existing contract.
 
-The configured Supabase URL and publishable key reach the live project. The
-live schema is incomplete: the `push_outbox`, `customer_folders`,
-`staff_notifications`, and `customer_contract_documents` relations are missing.
-Apply any unapplied migrations 1 through 9 in order before using the updated
-app. Migration 5 adds staff roles, customer
-assignment/folders, role scoped access policies, routed direct chats, quick
-conversation notifications and staff inbox Realtime. Migration 7 sets the final
-year-based contract-number format; migration 8 assigns role-based staff IDs.
-Migration 9 creates private per-customer PDF/Word contract storage and private
-message attachments.
-Existing manager accounts
-must be assigned `management` or `accounting` in `profiles.staff_role`; promote
-staff only from the trusted Supabase dashboard. Firebase client configuration,
-APNs, push-function deployment and webhook, and bank/customer seed data remain
-separate setup items. Database push outbox and in-app notifications are
-generated by the backend; external push delivery still depends on configuring
-Firebase and the Supabase webhook.
+The configured Supabase URL and publishable key reach the live project. Its
+folder, contract-document, notification and push queue migrations have been
+applied. The Android Firebase sender, worker and scheduled reminders are
+configured as described above. iOS/APNs and web VAPID setup remain separate
+platform-specific work. Passing server validation does not replace a physical
+device notification test or release-signing checks before distribution.

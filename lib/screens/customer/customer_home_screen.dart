@@ -13,12 +13,14 @@ class CustomerHomeScreen extends StatelessWidget {
   final AppState appState;
   final ValueChanged<int> onNavigateTab;
   final PortalRepository? repository;
+  final bool readOnly;
 
   const CustomerHomeScreen({
     super.key,
     required this.appState,
     required this.onNavigateTab,
     this.repository,
+    this.readOnly = false,
   });
 
   String _timeBasedGreeting() {
@@ -82,19 +84,19 @@ class CustomerHomeScreen extends StatelessWidget {
                   size: 24,
                 ),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                   'Sözleşmeniz onay bekliyor',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppGlass.textPrimary(context),
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Hesabınız kullanılabilir. Sözleşme ve proje bilgileriniz eklendiğinde bu sayfada görüntülenecek.',
                   style: TextStyle(
-                    color: Color(0xFFA9A39A),
+                    color: AppGlass.textSecondary(context),
                     fontSize: 12.5,
                     height: 1.45,
                   ),
@@ -105,7 +107,7 @@ class CustomerHomeScreen extends StatelessWidget {
                     horizontal: 18,
                     vertical: 10,
                   ),
-                  onPressed: () => onNavigateTab(2),
+                  onPressed: readOnly ? null : () => onNavigateTab(2),
                   child: const Text('İletişime geç'),
                 ),
               ],
@@ -124,7 +126,7 @@ class CustomerHomeScreen extends StatelessWidget {
           minimumSize: Size.zero,
           pressedOpacity: 0.7,
           alignment: Alignment.centerLeft,
-          onPressed: () => _showIosCustomerPicker(context),
+          onPressed: readOnly ? null : () => _showIosCustomerPicker(context),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -172,12 +174,14 @@ class CustomerHomeScreen extends StatelessWidget {
           paidCount: paidCount,
           totalNotes: notes.length,
           isDark: isDark,
-          onPayTap: () => showUploadReceiptSheet(
-            context,
-            appState,
-            repository: repository,
-            preselectedNote: urgentNote,
-          ),
+          onPayTap: readOnly
+              ? null
+              : () => showUploadReceiptSheet(
+                  context,
+                  appState,
+                  repository: repository,
+                  preselectedNote: urgentNote,
+                ),
           onDetailsTap: () => onNavigateTab(1),
         ),
         const SizedBox(height: 14),
@@ -197,18 +201,20 @@ class CustomerHomeScreen extends StatelessWidget {
           paidCount: paidCount,
           totalNotes: notes.length,
           progress: progress,
-          onUploadTap: () {
-            if (overdueNotes.isNotEmpty) {
-              showUploadReceiptSheet(
-                context,
-                appState,
-                repository: repository,
-                preselectedNote: overdueNotes.first,
-              );
-            } else {
-              onNavigateTab(1);
-            }
-          },
+          onUploadTap: readOnly
+              ? null
+              : () {
+                  if (overdueNotes.isNotEmpty) {
+                    showUploadReceiptSheet(
+                      context,
+                      appState,
+                      repository: repository,
+                      preselectedNote: overdueNotes.first,
+                    );
+                  } else {
+                    onNavigateTab(1);
+                  }
+                },
           onIbanTap: () => showIbanSheet(context, appState),
         ),
         const SizedBox(height: 14),
@@ -323,16 +329,18 @@ class CustomerHomeScreen extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
-                    onTap: () {
-                      if (note.status != NoteStatus.paid) {
-                        showUploadReceiptSheet(
-                          context,
-                          appState,
-                          repository: repository,
-                          preselectedNote: note,
-                        );
-                      }
-                    },
+                    onTap: readOnly
+                        ? null
+                        : () {
+                            if (note.status != NoteStatus.paid) {
+                              showUploadReceiptSheet(
+                                context,
+                                appState,
+                                repository: repository,
+                                preselectedNote: note,
+                              );
+                            }
+                          },
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
@@ -622,7 +630,7 @@ class _PurchasedHouseHeroCard extends StatelessWidget {
   final int paidCount;
   final int totalNotes;
   final bool isDark;
-  final VoidCallback onPayTap;
+  final VoidCallback? onPayTap;
   final VoidCallback onDetailsTap;
 
   const _PurchasedHouseHeroCard({
@@ -1399,7 +1407,7 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
   final int paidCount;
   final int totalNotes;
   final double progress;
-  final VoidCallback onUploadTap;
+  final VoidCallback? onUploadTap;
   final VoidCallback onIbanTap;
 
   const _NextInstallmentSpotlightCard({

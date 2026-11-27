@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Build-time configuration for the hosted backend.
 ///
 /// The publishable key is expected to be present in the client application;
@@ -53,13 +55,31 @@ class FirebaseBackendConfig {
       senderId.isNotEmpty &&
       projectId.isNotEmpty;
 
-  factory FirebaseBackendConfig.fromEnvironment() =>
-      const FirebaseBackendConfig(
-        apiKey: String.fromEnvironment('FIREBASE_API_KEY'),
-        appId: String.fromEnvironment('FIREBASE_APP_ID'),
-        senderId: String.fromEnvironment('FIREBASE_SENDER_ID'),
-        projectId: String.fromEnvironment('FIREBASE_PROJECT_ID'),
-        iosBundleId: String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
-        webVapidKey: String.fromEnvironment('FIREBASE_WEB_VAPID_KEY'),
-      );
+  factory FirebaseBackendConfig.fromEnvironment() {
+    var appId = const String.fromEnvironment('FIREBASE_APP_ID');
+    if (appId.isEmpty) {
+      appId = kIsWeb
+          ? '1:833952865318:web:7c0e25f433f20b2f715ae7'
+          : defaultTargetPlatform == TargetPlatform.android
+          ? '1:833952865318:android:ba089ccca4bf1b14715ae7'
+          : '';
+    }
+    return FirebaseBackendConfig(
+      apiKey: const String.fromEnvironment(
+        'FIREBASE_API_KEY',
+        defaultValue: 'AIzaSyA_fNZAB0fGLFV9Arbk4iEklgB85NFOlEk',
+      ),
+      appId: appId,
+      senderId: const String.fromEnvironment(
+        'FIREBASE_SENDER_ID',
+        defaultValue: '833952865318',
+      ),
+      projectId: const String.fromEnvironment(
+        'FIREBASE_PROJECT_ID',
+        defaultValue: 'demirturk-mobil-4954e',
+      ),
+      iosBundleId: const String.fromEnvironment('FIREBASE_IOS_BUNDLE_ID'),
+      webVapidKey: const String.fromEnvironment('FIREBASE_WEB_VAPID_KEY'),
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import '../../services/user_facing_error.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -9,9 +10,9 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
+import '../../services/upload_policy.dart';
 import '../../widgets/website_blurred_background.dart';
-import 'website_iframe_stub.dart'
-    if (dart.library.html) 'website_iframe_web.dart';
+import '../../widgets/company_links.dart';
 
 class CustomerSupportScreen extends StatefulWidget {
   final AppState appState;
@@ -21,9 +22,9 @@ class CustomerSupportScreen extends StatefulWidget {
     super.key,
     required this.appState,
     this.repository,
+    this.initialTicketId,
   });
-
-  static const String companyPhoneTelUrl = 'tel:+905313730054';
+  final String? initialTicketId;
 
   @override
   State<CustomerSupportScreen> createState() => _CustomerSupportScreenState();
@@ -38,6 +39,7 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
       return _BackendSupportScreen(
         appState: widget.appState,
         repository: widget.repository!,
+        initialTicketId: widget.initialTicketId,
       );
     }
     final isDark = AppGlass.isDark(context);
@@ -117,9 +119,11 @@ class _CustomerSupportScreenState extends State<CustomerSupportScreen> {
             );
           },
           onCallTap: () {
-            launchPhoneDialer(CustomerSupportScreen.companyPhoneTelUrl);
+            openCompanyLink(context, companyPhone);
           },
         ),
+        const SizedBox(height: 12),
+        const CompanyContactCard(),
 
         // 4. Alttaki Boşluk: Satış danışmanı dışındaki yeni/aktif mesajlar buraya düşer
         if (activeOtherTickets.isNotEmpty) ...[
@@ -606,8 +610,17 @@ class _InlineConversationPageState extends State<_InlineConversationPage> {
                         );
                         final telUrl = digits.isNotEmpty
                             ? 'tel:$digits'
-                            : CustomerSupportScreen.companyPhoneTelUrl;
-                        launchPhoneDialer(telUrl);
+                            : companyPhone.url;
+                        openCompanyLink(
+                          context,
+                          CompanyLink(
+                            digits.isEmpty
+                                ? companyPhone.label
+                                : widget.advisor.phone,
+                            telUrl,
+                            Icons.phone_outlined,
+                          ),
+                        );
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -1041,10 +1054,12 @@ class _BackendSupportScreen extends StatefulWidget {
   const _BackendSupportScreen({
     required this.appState,
     required this.repository,
+    this.initialTicketId,
   });
 
   final AppState appState;
   final PortalRepository repository;
+  final String? initialTicketId;
 
   @override
   State<_BackendSupportScreen> createState() => _BackendSupportScreenState();
@@ -1058,6 +1073,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
   bool _loading = true;
   bool _sending = false;
   Object? _loadError;
+  bool _initialTicketOpened = false;
   final _messageController = TextEditingController();
   PlatformFile? _selectedAttachment;
   Uint8List? _selectedAttachmentBytes;
@@ -1091,6 +1107,24 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
         _loading = false;
         _loadError = null;
       });
+      if (!_initialTicketOpened && widget.initialTicketId != null) {
+        _initialTicketOpened = true;
+        final ticket = _tickets
+            .where(
+              (row) =>
+                  row['id'] == widget.initialTicketId &&
+                  row['closed_at'] == null,
+            )
+            .firstOrNull;
+        if (ticket != null) {
+          unawaited(
+            _openChannel(
+              ticket['channel'].toString(),
+              ticketId: ticket['id'].toString(),
+            ),
+          );
+        }
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -1100,7 +1134,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
     }
   }
 
-  Future<void> _openChannel(String channel) async {
+  Future<void> _openChannel(String channel, {String? ticketId}) async {
     if (channel == 'advisor' &&
         widget.appState.currentCustomer.assignedAdvisorId.isEmpty) {
       _showError(
@@ -1113,7 +1147,9 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
       _loadError = null;
     });
     try {
-      final id = await widget.repository.getOrCreateCustomerTicket(channel);
+      final id =
+          ticketId ??
+          await widget.repository.getOrCreateCustomerTicket(channel);
       await _messageSubscription?.cancel();
       final messages = await widget.repository.loadTicketMessages(id);
       if (!mounted) return;
@@ -1192,7 +1228,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
     try {
       final file = await FilePicker.pickFile(type: FileType.any);
       if (file == null) return;
-      final bytes = await file.readAsBytes();
+      final bytes = await UploadPolicy.readFile(file, UploadPolicy.attachmentBytes);
       if (bytes.isEmpty) {
         _showError(
           'Dosya okunamadı. Daha küçük bir dosya seçip tekrar deneyin.',
@@ -1287,7 +1323,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
 
   void _showError(Object error) {
     ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(error.toString())));
+        .showSnackBar(SnackBar(content: Text(userFacingError(error))));
   }
 
   @override
@@ -1602,7 +1638,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Text(
-              'Sohbetler yüklenemedi: $_loadError',
+              userFacingError(_loadError, fallback: 'Sohbetler yüklenemedi. Tekrar deneyin.'),
               style: const TextStyle(color: Color(0xFFE11D48)),
             ),
           ),
@@ -1651,8 +1687,7 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
               color: AppGlass.subtleSurface(context),
               borderRadius: BorderRadius.circular(17),
-              onPressed: () =>
-                  launchPhoneDialer(CustomerSupportScreen.companyPhoneTelUrl),
+              onPressed: () => openCompanyLink(context, companyPhone),
               child: Icon(
                 CupertinoIcons.phone,
                 size: 17,
@@ -1661,6 +1696,8 @@ class _BackendSupportScreenState extends State<_BackendSupportScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 12),
+        const CompanyContactCard(),
         if (ticketFor('general') case final Map<String, dynamic> ticket?)
           if ((ticket['closed_at'] == null) &&
               (ticket['ticket_messages'] as List? ?? const []).isNotEmpty)

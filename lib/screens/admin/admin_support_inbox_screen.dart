@@ -1,3 +1,4 @@
+import '../../services/user_facing_error.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../services/portal_repository.dart';
+import '../../services/upload_policy.dart';
 import '../../widgets/website_blurred_background.dart';
 
 class AdminSupportInboxScreen extends StatefulWidget {
@@ -14,10 +16,12 @@ class AdminSupportInboxScreen extends StatefulWidget {
     super.key,
     required this.repository,
     this.closedOnly = false,
+    this.initialTicketId,
   });
 
   final PortalRepository repository;
   final bool closedOnly;
+  final String? initialTicketId;
 
   @override
   State<AdminSupportInboxScreen> createState() =>
@@ -28,6 +32,7 @@ class _AdminSupportInboxScreenState extends State<AdminSupportInboxScreen> {
   List<Map<String, dynamic>> _tickets = const [];
   bool _loading = true;
   Object? _error;
+  bool _initialTicketOpened = false;
   StreamSubscription<List<Map<String, dynamic>>>? _ticketSubscription;
 
   @override
@@ -56,6 +61,17 @@ class _AdminSupportInboxScreenState extends State<AdminSupportInboxScreen> {
         _loading = false;
         _error = null;
       });
+      if (!_initialTicketOpened && widget.initialTicketId != null) {
+        _initialTicketOpened = true;
+        final ticket = _tickets
+            .where((row) => row['id'] == widget.initialTicketId)
+            .firstOrNull;
+        if (ticket != null) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) unawaited(_openConversation(ticket));
+          });
+        }
+      }
     } catch (error) {
       if (mounted) {
         setState(() {
@@ -76,8 +92,8 @@ class _AdminSupportInboxScreenState extends State<AdminSupportInboxScreen> {
         children: [
           Text(
             title,
-            style: const TextStyle(
-              color: Colors.white,
+            style: TextStyle(
+              color: AppGlass.textPrimary(context),
               fontSize: 18,
               fontWeight: FontWeight.w700,
             ),
@@ -92,7 +108,7 @@ class _AdminSupportInboxScreenState extends State<AdminSupportInboxScreen> {
           const SizedBox(height: 14),
           if (_error != null)
             Text(
-              'Yüklenemedi: $_error',
+              userFacingError(_error, fallback: 'Yüklenemedi. Tekrar deneyin.'),
               style: const TextStyle(color: Color(0xFFE11D48)),
             ),
           if (_loading)
@@ -163,8 +179,8 @@ class _AdminSupportInboxScreenState extends State<AdminSupportInboxScreen> {
                   children: [
                     Text(
                       customer['full_name']?.toString() ?? 'Müşteri',
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: TextStyle(
+                        color: AppGlass.textPrimary(context),
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -287,7 +303,7 @@ class _AdminConversationState extends State<_AdminConversation> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Mesajlar yüklenemedi: $error')));
+        ).showSnackBar(SnackBar(content: Text(userFacingError(error, fallback: 'Mesajlar yüklenemedi. Tekrar deneyin.'))));
       }
     }
   }
@@ -333,7 +349,7 @@ class _AdminConversationState extends State<_AdminConversation> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Mesaj gönderilemedi: $error')));
+        ).showSnackBar(SnackBar(content: Text(userFacingError(error, fallback: 'Mesaj gönderilemedi. Tekrar deneyin.'))));
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -345,7 +361,7 @@ class _AdminConversationState extends State<_AdminConversation> {
     try {
       final file = await FilePicker.pickFile(type: FileType.any);
       if (file == null) return;
-      final bytes = await file.readAsBytes();
+      final bytes = await UploadPolicy.readFile(file, UploadPolicy.attachmentBytes);
       if (bytes.isEmpty) {
         throw const FormatException('Dosya okunamadı.');
       }
@@ -359,7 +375,7 @@ class _AdminConversationState extends State<_AdminConversation> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Dosya seçilemedi: $error')));
+            .showSnackBar(SnackBar(content: Text(userFacingError(error, fallback: 'Dosya seçilemedi. Tekrar deneyin.'))));
       }
     }
   }
@@ -504,7 +520,7 @@ class _AdminConversationState extends State<_AdminConversation> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
-                                          'Dosya açılamadı: $error',
+                                          userFacingError(error, fallback: 'Dosya açılamadı. Tekrar deneyin.'),
                                         ),
                                       ),
                                     );

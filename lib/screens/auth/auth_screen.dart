@@ -1,3 +1,4 @@
+import '../../services/user_facing_error.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../../services/auth_repository.dart';
 import '../../services/backend_config.dart';
 import '../../utils/turkish_phone_input_formatter.dart';
 import '../../widgets/website_blurred_background.dart';
+import '../../widgets/company_links.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key, required this.appState, this.onAuthenticated});
@@ -25,39 +27,29 @@ class _AuthScreenState extends State<AuthScreen> {
     'ENABLE_DEMO_LOGIN',
   );
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
   final _otpController = TextEditingController();
   final _passwordFocusNode = FocusNode();
 
   bool _isRegistering = false;
   bool _isAdmin = false;
-  UserRole _selectedStaffRole = UserRole.management;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _awaitingOtp = false;
   bool _resetPasswordFlow = false;
   bool _resetPasswordReady = false;
-  bool _passwordDotsLatched = false;
 
   @override
   void initState() {
     super.initState();
-    _passwordFocusNode.addListener(_handlePasswordFocusChange);
     _passwordController.addListener(_handlePasswordChange);
     _phoneController.addListener(_handlePhoneChange);
   }
 
-  bool get _isPhoneReadyForPassword =>
-      _normalizePhone(_phoneController.text) != null;
-
-  bool get _showPasswordDotAnimation =>
-      _isRegistering || _resetPasswordReady || _passwordDotsLatched;
-  // SMS-based reset stays in the repository for a future verified release,
-  // but is intentionally unavailable while SMS OTP is disabled in this MVP.
-  bool get _canRequestPasswordReset => false;
+  bool get _showPasswordDotAnimation => !_isPasswordVisible;
+  // Recover through the company after an independent identity check.
+  bool get _canRequestPasswordReset => !_isAdmin;
 
   void _handlePhoneChange() {
     if (mounted) setState(() {});
@@ -67,40 +59,18 @@ class _AuthScreenState extends State<AuthScreen> {
     if (mounted) setState(() {});
   }
 
-  void _handlePasswordFocusChange() {
-    if (!mounted) return;
-    if (_passwordFocusNode.hasFocus && _isPhoneReadyForPassword) {
-      _passwordDotsLatched = true;
-    }
-    setState(() {});
-  }
-
   @override
   void dispose() {
-    _nameController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    _confirmController.dispose();
-    _otpController.dispose();
-    _passwordFocusNode
-      ..removeListener(_handlePasswordFocusChange)
-      ..dispose();
     _phoneController.removeListener(_handlePhoneChange);
     _passwordController.removeListener(_handlePasswordChange);
+    _phoneController.dispose();
+    _passwordController.dispose();
+    _otpController.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
-  String? _normalizePhone(String value) {
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    // The UI accepts a Turkish national number: 10 digits without the trunk
-    // zero, or 11 digits with it. Country code entry is intentionally omitted.
-    if (digits.startsWith('0') && digits.length == 11) {
-      return '+90${digits.substring(1)}';
-    } else if (digits.length == 10) {
-      return '+90$digits';
-    }
-    return null;
-  }
+  String? _normalizePhone(String value) => normalizeTurkishPhoneNumber(value);
 
   void _showMessage(String message, {bool isError = false}) {
     ScaffoldMessenger.of(context)
@@ -173,7 +143,6 @@ class _AuthScreenState extends State<AuthScreen> {
           _resetPasswordReady = false;
           _resetPasswordFlow = false;
           _passwordController.clear();
-          _confirmController.clear();
           _otpController.clear();
         });
         _showMessage(
@@ -190,9 +159,7 @@ class _AuthScreenState extends State<AuthScreen> {
           setState(() {
             _awaitingOtp = false;
             _resetPasswordReady = true;
-            _passwordDotsLatched = false;
             _passwordController.clear();
-            _confirmController.clear();
           });
           _showMessage('Kod doğrulandı. Yeni parolanızı belirleyin.');
         } else {
@@ -209,11 +176,10 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await auth.register(
           phone: phone,
           password: _passwordController.text,
-          fullName: _nameController.text.trim(),
         );
         if (response.session == null || response.user == null) {
           _showMessage(
-            'Hesap oturumu oluşturulamadı. Supabase Phone sağlayıcısında "Confirm phone" kapalı olmalı.',
+            'Hesap oluşturulamadı. Lütfen tekrar deneyin.',
             isError: true,
           );
           return;
@@ -269,11 +235,16 @@ class _AuthScreenState extends State<AuthScreen> {
         widget.onAuthenticated?.call(userRole);
       }
     } on AuthException catch (error) {
-      _showMessage(error.message, isError: true);
+      _showMessage(userFacingError(error), isError: true);
     } on PostgrestException catch (error) {
-      _showMessage(error.message, isError: true);
-    } catch (error) {
-      _showMessage('İşlem tamamlanamadı: $error', isError: true);
+      _showMessage(userFacingError(error), isError: true);
+    } catch (_) {
+      _showMessage(
+        _isRegistering
+            ? 'Hesap oluşturulamadı. Kayıt servisi kullanılamıyor; lütfen daha sonra tekrar deneyin.'
+            : 'İşlem tamamlanamadı. Bağlantınızı kontrol edip tekrar deneyin.',
+        isError: true,
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -282,52 +253,28 @@ class _AuthScreenState extends State<AuthScreen> {
   void _setMode({bool? registering, bool? admin}) {
     setState(() {
       _isAdmin = admin ?? _isAdmin;
-      _isRegistering = registering ?? _isRegistering;
+      _isRegistering = _isAdmin ? false : (registering ?? _isRegistering);
       _awaitingOtp = false;
       _resetPasswordFlow = false;
       _resetPasswordReady = false;
-      if ((admin ?? _isAdmin) && (registering ?? _isRegistering)) {
-        _selectedStaffRole = UserRole.management;
-      }
       _otpController.clear();
     });
   }
 
   Future<void> _requestPasswordReset() async {
-    final phone = _normalizePhone(_phoneController.text);
-    if (phone == null) {
-      _showMessage('Önce geçerli telefon numaranızı girin.', isError: true);
-      return;
-    }
-    final config = BackendConfig.fromEnvironment();
-    if (!config.isConfigured) {
-      _showMessage(
-        'Parola sıfırlama için telefon doğrulama servisi gerekli.',
-        isError: true,
-      );
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      await AuthRepository(Supabase.instance.client)
-          .requestPasswordReset(phone);
-      setState(() {
-        _awaitingOtp = true;
-        _resetPasswordFlow = true;
-        _resetPasswordReady = false;
-        _otpController.clear();
-      });
-      _showMessage('Telefonunuza gelen kodu girin.');
-    } on AuthException catch (error) {
-      _showMessage(error.message, isError: true);
-    } catch (_) {
-      _showMessage(
-        'Kod gönderilemedi. Telefon numaranızı kontrol edip tekrar deneyin.',
-        isError: true,
-      );
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+    final contact = await showDialog<CompanyLink>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hesabınızı kurtarın'),
+        content: const Text('Parolanızı unuttuysanız şirketimizle iletişime geçin. Kimliğiniz kontrol edildikten sonra hesabınızı kurtarmanıza yardımcı olacağız. Parolanızı veya doğrulama kodunuzu paylaşmayın.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Vazgeç')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext, companyEmail), child: const Text('E-posta')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, companyPhone), child: const Text('Şirketi ara')),
+        ],
+      ),
+    );
+    if (contact != null && mounted) await openCompanyLink(context, contact);
   }
 
   @override
@@ -466,25 +413,6 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                if (_isRegistering &&
-                                    !_awaitingOtp &&
-                                    !_resetPasswordReady) ...[
-                                  _AuthField(
-                                    controller: _nameController,
-                                    label: 'Ad soyad',
-                                    hint: 'Adınızı ve soyadınızı girin',
-                                    icon: CupertinoIcons.person,
-                                    fill: fieldFill,
-                                    foreground: foreground,
-                                    muted: muted,
-                                    validator: (value) =>
-                                        (value == null ||
-                                            value.trim().length < 3)
-                                        ? 'Ad soyad alanını doldurun.'
-                                        : null,
-                                  ),
-                                  const SizedBox(height: 13),
-                                ],
                                 if (!_resetPasswordReady)
                                   _AuthField(
                                     controller: _phoneController,
@@ -555,22 +483,13 @@ class _AuthScreenState extends State<AuthScreen> {
                                             ),
                                           ),
                                     enabled: !_awaitingOtp,
-                                    keyboardType:
-                                        _isRegistering || _resetPasswordReady
-                                        ? TextInputType.number
-                                        : TextInputType.visiblePassword,
-                                    inputFormatters:
-                                        _isRegistering || _resetPasswordReady
-                                        ? [
-                                            FilteringTextInputFormatter
-                                                .digitsOnly,
-                                            LengthLimitingTextInputFormatter(6),
-                                          ]
-                                        : null,
-                                    maxLength:
-                                        _isRegistering || _resetPasswordReady
-                                        ? 6
-                                        : null,
+                                    keyboardType: TextInputType.number,
+                                    textInputAction: TextInputAction.done,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(6),
+                                    ],
+                                    maxLength: 6,
                                     validator: (value) {
                                       if (_isRegistering ||
                                           _resetPasswordReady) {
@@ -580,9 +499,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                             ? null
                                             : 'Parola 6 rakamdan oluşmalı.';
                                       }
-                                      return value == null || value.isEmpty
-                                          ? 'Parola alanını doldurun.'
-                                          : null;
+                                      return value != null &&
+                                              RegExp(r'^\d{6}$').hasMatch(value)
+                                          ? null
+                                          : 'Parola 6 rakamdan oluşmalı.';
                                     },
                                   ),
                                   if (_canRequestPasswordReset &&
@@ -606,30 +526,6 @@ class _AuthScreenState extends State<AuthScreen> {
                                         ),
                                       ),
                                     ),
-                                  if ((_isRegistering || _resetPasswordReady) &&
-                                      !(_isAdmin && _isRegistering)) ...[
-                                    const SizedBox(height: 13),
-                                    _AuthField(
-                                      controller: _confirmController,
-                                      label: 'Parolanızı doğrulayın',
-                                      hint: 'Parolanızı doğrulayın',
-                                      icon: CupertinoIcons.lock_shield,
-                                      fill: fieldFill,
-                                      foreground: foreground,
-                                      muted: muted,
-                                      obscureText: true,
-                                      keyboardType: TextInputType.number,
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(6),
-                                      ],
-                                      maxLength: 6,
-                                      validator: (value) =>
-                                          value != _passwordController.text
-                                          ? 'Parolalar eşleşmiyor.'
-                                          : null,
-                                    ),
-                                  ],
                                 ] else if (_awaitingOtp) ...[
                                   const SizedBox(height: 13),
                                   _AuthField(
@@ -646,16 +542,6 @@ class _AuthScreenState extends State<AuthScreen> {
                                             value.trim().length != 6)
                                         ? '6 haneli kodu girin.'
                                         : null,
-                                  ),
-                                ],
-                                if (_isAdmin &&
-                                    _isRegistering &&
-                                    !_awaitingOtp) ...[
-                                  const SizedBox(height: 16),
-                                  _buildStaffRoleSelector(
-                                    foreground: foreground,
-                                    muted: muted,
-                                    isDark: isDark,
                                   ),
                                 ],
                                 const SizedBox(height: 19),
@@ -694,19 +580,22 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         const SizedBox(height: 27),
-                        Center(
-                          child: SizedBox(
-                            width: 88,
-                            child: _ModeToggle(
-                              isDark: isDark,
-                              isRegistering: _isRegistering,
-                              onChange: _awaitingOtp
-                                  ? null
-                                  : (registering) =>
-                                        _setMode(registering: registering),
+                        if (!_isAdmin)
+                          Center(
+                            child: SizedBox(
+                              width: 88,
+                              child: _ModeToggle(
+                                isDark: isDark,
+                                isRegistering: _isRegistering,
+                                onChange: _awaitingOtp
+                                    ? null
+                                    : (registering) =>
+                                          _setMode(registering: registering),
+                              ),
                             ),
                           ),
-                        ),
+                        const SizedBox(height: 18),
+                        const CompanyLinksFooter(),
                       ],
                     ),
                   ),
@@ -754,96 +643,6 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  Widget _buildStaffRoleSelector({
-    required Color foreground,
-    required Color muted,
-    required bool isDark,
-  }) {
-    const options = <(UserRole, String)>[
-      (UserRole.salesAdvisor, 'Satış Danışmanı'),
-      (UserRole.accounting, 'Muhasebe'),
-      (UserRole.management, 'Yönetim'),
-    ];
-    final selectedDescription = _selectedStaffRole.isSalesAdvisor
-        ? 'Kendi müşterileri ve genel mesajlar'
-        : 'Tüm müşteriler, mesajlar, senetler ve süreçler';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 7),
-          child: Text(
-            'Hesap türü',
-            style: TextStyle(
-              color: foreground,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: isDark
-                ? Colors.white.withValues(alpha: .055)
-                : const Color(0xFF0F172A).withValues(alpha: .045),
-            border: Border.all(color: AppGlass.dividerColor(context)),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Row(
-            children: options.map((option) {
-              final selected = _selectedStaffRole == option.$1;
-              return Expanded(
-                child: CupertinoButton(
-                  minimumSize: Size.zero,
-                  padding: EdgeInsets.zero,
-                  borderRadius: BorderRadius.circular(14),
-                  onPressed: () =>
-                      setState(() => _selectedStaffRole = option.$1),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    height: 42,
-                    alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    decoration: BoxDecoration(
-                      color: selected
-                          ? (isDark ? const Color(0xFFF5F3F0) : Colors.white)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      option.$2,
-                      textAlign: TextAlign.center,
-                      maxLines: 2,
-                      style: TextStyle(
-                        color: selected ? foreground : muted,
-                        fontSize: 10.5,
-                        height: 1.1,
-                        fontWeight: selected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Padding(
-          padding: const EdgeInsets.only(left: 4),
-          child: Text(
-            selectedDescription,
-            style: TextStyle(color: muted, fontSize: 10.5),
-          ),
-        ),
-      ],
-    );
-  }
-
   Future<void> _resendOtp() async {
     final phone = _normalizePhone(_phoneController.text);
     if (phone == null) return;
@@ -857,7 +656,7 @@ class _AuthScreenState extends State<AuthScreen> {
       }
       _showMessage('Yeni doğrulama kodu gönderildi.');
     } on AuthException catch (error) {
-      _showMessage(error.message, isError: true);
+      _showMessage(userFacingError(error), isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -874,6 +673,7 @@ class _AuthField extends StatelessWidget {
     required this.foreground,
     required this.muted,
     this.keyboardType,
+    this.textInputAction,
     this.inputFormatters,
     this.maxLength,
     this.obscureText = false,
@@ -895,6 +695,7 @@ class _AuthField extends StatelessWidget {
   final Color foreground;
   final Color muted;
   final TextInputType? keyboardType;
+  final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
   final bool obscureText;
@@ -929,7 +730,9 @@ class _AuthField extends StatelessWidget {
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 880),
               curve: Curves.easeInOutCubic,
-              width: morphToDots ? 142 : constraints.maxWidth,
+              // Keep the focused input geometry stable while the dot view is
+              // shown; IMEs can otherwise mishandle backspace during resize.
+              width: constraints.maxWidth,
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(morphToDots ? 28 : 18),
@@ -944,11 +747,23 @@ class _AuthField extends StatelessWidget {
                     child: TextFormField(
                       controller: controller,
                       focusNode: focusNode,
+                      onTapAlwaysCalled: true,
+                      onTap: morphToDots
+                          ? () {
+                              controller.selection = TextSelection.collapsed(
+                                offset: controller.text.length,
+                              );
+                            }
+                          : null,
+                      enableInteractiveSelection: !morphToDots,
                       keyboardType: keyboardType,
+                      textInputAction: textInputAction,
                       inputFormatters: inputFormatters,
                       maxLength: maxLength,
                       obscureText: obscureText,
                       obscuringCharacter: obscuringCharacter,
+                      autocorrect: false,
+                      enableSuggestions: false,
                       enabled: enabled,
                       validator: validator,
                       style: TextStyle(

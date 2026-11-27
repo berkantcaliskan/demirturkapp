@@ -46,3 +46,17 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Credentials and local backend state
+*.jks
+*.keystore
+*.p12
+key.properties
+.env
+.env.*
+!.env.example
+supabase/.temp/
+supabase/.branches/
+**/sender.json
+**/*service-account*.json
+backups/

@@ -4,12 +4,23 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val productionStore = System.getenv("DEMIRTURK_KEYSTORE_PATH")
+val productionStorePassword = System.getenv("DEMIRTURK_KEYSTORE_PASSWORD")
+val productionAlias = System.getenv("DEMIRTURK_KEY_ALIAS") ?: "demirturk"
+val productionKeyPassword = System.getenv("DEMIRTURK_KEY_PASSWORD") ?: productionStorePassword
+val releaseRequested = gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }
+if (releaseRequested && (productionStore.isNullOrBlank() || productionStorePassword.isNullOrBlank() ||
+    !file(productionStore).exists())) {
+    throw GradleException("Production signing is required. Configure DEMIRTURK_KEYSTORE_PATH and DEMIRTURK_KEYSTORE_PASSWORD.")
+}
+
 android {
     namespace = "com.sirket.senettakip.senet_takip"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
+        isCoreLibraryDesugaringEnabled = true
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
@@ -29,13 +40,25 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        create("production") {
+            if (!productionStore.isNullOrBlank()) storeFile = file(productionStore)
+            storePassword = productionStorePassword
+            keyAlias = productionAlias
+            keyPassword = productionKeyPassword
         }
     }
+
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.getByName("production")
+            isDebuggable = false
+        }
+    }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 }
 
 kotlin {

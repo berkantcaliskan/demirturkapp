@@ -336,6 +336,12 @@ class AppState extends ChangeNotifier {
         ?.toString(),
     contractDocumentName: (row['contract_document'] as Map?)?['file_name']
         ?.toString(),
+    isPendingContractRecord: row['is_pending_contract_record'] == true,
+    foldersByOwner: {
+      for (final folder
+          in (row['folder_memberships'] as List? ?? const []).whereType<Map>())
+        folder['owner_id'].toString(): folder['folder_id'].toString(),
+    },
   );
 
   PromissoryNote _noteFromRow(Map<String, dynamic> row) {

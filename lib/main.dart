@@ -1,3 +1,4 @@
+import './services/user_facing_error.dart';
 import 'dart:ui';
 import 'dart:async';
 
@@ -9,16 +10,22 @@ import 'services/backend_config.dart';
 import 'services/portal_repository.dart';
 import 'services/push_notification_service.dart';
 import 'services/auth_repository.dart';
+import 'services/secure_session_storage.dart';
 import 'models/app_models.dart';
 import 'services/app_state.dart';
 import 'screens/auth/auth_screen.dart';
+import 'screens/customer/customer_contract_card.dart';
 import 'screens/customer/customer_home_screen.dart';
 import 'screens/customer/customer_notes_screen.dart';
 import 'screens/customer/customer_project_screen.dart';
+import 'screens/customer/customer_project_showcase.dart';
 import 'screens/customer/customer_support_screen.dart';
 import 'screens/customer/iban_and_statement_sheets.dart';
 import 'screens/admin/admin_dashboard_screen.dart';
+import 'screens/admin/admin_support_inbox_screen.dart';
+import 'screens/admin/account_preview_screen.dart';
 import 'widgets/website_blurred_background.dart';
+import 'widgets/company_links.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +35,9 @@ Future<void> main() async {
     await Supabase.initialize(
       url: backendConfig.url!,
       publishableKey: backendConfig.publishableKey!,
+      authOptions: FlutterAuthClientOptions(
+        localStorage: SecureSessionStorage(projectUrl: backendConfig.url!),
+      ),
     );
   }
   runApp(const SenetTakipApp());
@@ -46,11 +56,28 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
   static const String _fontFamily = 'Plus Jakarta Sans';
   bool _isAuthenticated = false;
   bool _startupComplete = false;
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
     unawaited(_restorePersistedSession());
+    if (BackendConfig.fromEnvironment().isConfigured) {
+      _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
+        if (event.event == AuthChangeEvent.signedOut && mounted) {
+          _appState.clearSessionData();
+          _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+          setState(() => _isAuthenticated = false);
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_authSubscription?.cancel());
+    _appState.dispose();
+    super.dispose();
   }
 
   Future<void> _restorePersistedSession() async {
@@ -81,7 +108,7 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
           _isAuthenticated = true;
         }
       } catch (error) {
-        debugPrint('Could not restore the saved session profile: $error');
+        debugPrint(userFacingError(error, fallback: 'Could not restore the saved session profile. Tekrar deneyin.'));
       }
     }
     await minSplash;
@@ -102,12 +129,12 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
           await PushNotificationService(Supabase.instance.client)
               .unregisterCurrentToken();
         } catch (error) {
-          debugPrint('Could not unregister push device: $error');
+          debugPrint(userFacingError(error, fallback: 'Could not unregister push device. Tekrar deneyin.'));
         }
         await Supabase.instance.client.auth.signOut();
       }
     } catch (error) {
-      debugPrint('Sign out failed remotely; clearing local session: $error');
+      debugPrint(userFacingError(error, fallback: 'Sign out failed remotely; clearing local session. Tekrar deneyin.'));
     } finally {
       _appState.clearSessionData();
       _appState.setRole(UserRole.customer);
@@ -355,31 +382,31 @@ class _MainShellState extends State<MainShell> {
   bool _backendDataReady = false;
   bool _customerContractPending = false;
   Object? _backendDataError;
+  Map<String, dynamic>? _pendingPush;
 
   @override
   void initState() {
     super.initState();
     if (BackendConfig.fromEnvironment().isConfigured &&
         Supabase.instance.client.auth.currentUser != null) {
-      _portalRepository = PortalRepository(Supabase.instance.client);
+      _portalRepository = PortalRepository(
+        Supabase.instance.client,
+        staffNotifications: widget.appState.currentRole.isStaff,
+      );
       _pushService = PushNotificationService(Supabase.instance.client);
       _notificationSubscription = _portalRepository!
           .watchMyNotifications()
           .listen(
             widget.appState.replaceCustomerNotifications,
             onError: (Object error) =>
-                debugPrint('Inbox realtime error: $error'),
+                debugPrint(userFacingError(error, fallback: 'Inbox realtime error. Tekrar deneyin.')),
           );
       unawaited(
         _pushService!.start(
           onMessage: (payload) {
             unawaited(_refreshNotifications());
-            if (mounted && payload.isNotEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Yeni bir bildiriminiz var')),
-              );
-            }
           },
+          onOpened: _openPushNotification,
         ),
       );
       unawaited(_refreshNotifications());
@@ -387,13 +414,19 @@ class _MainShellState extends State<MainShell> {
       unawaited(_loadPortalData());
       _notesSubscription = _portalRepository!.watchNotes().listen(
         (_) => unawaited(_refreshPortalNotes()),
-        onError: (Object error) => debugPrint('Notes realtime error: $error'),
+        onError: (Object error) => debugPrint(userFacingError(error, fallback: 'Notes realtime error. Tekrar deneyin.')),
       );
       if (widget.appState.currentRole.isStaff) {
         _customersSubscription = _portalRepository!.watchCustomers().listen(
           (_) => unawaited(_refreshCustomers()),
           onError: (Object error) =>
-              debugPrint('Customers realtime error: $error'),
+              debugPrint(userFacingError(error, fallback: 'Customers realtime error. Tekrar deneyin.')),
+        );
+      } else {
+        _customersSubscription = _portalRepository!.watchMyCustomer().listen(
+          (_) => unawaited(_refreshMyCustomer()),
+          onError: (Object error) =>
+              debugPrint(userFacingError(error, fallback: 'Customer realtime error. Tekrar deneyin.')),
         );
       }
     } else {
@@ -412,7 +445,7 @@ class _MainShellState extends State<MainShell> {
         await repository.loadMyNotifications(),
       );
     } catch (error) {
-      debugPrint('Inbox refresh failed: $error');
+      debugPrint(userFacingError(error, fallback: 'Inbox refresh failed. Tekrar deneyin.'));
     }
   }
 
@@ -425,7 +458,7 @@ class _MainShellState extends State<MainShell> {
           : await repository.loadMyNotes();
       widget.appState.replaceBackendNotes(notes);
     } catch (error) {
-      debugPrint('Notes refresh failed: $error');
+      debugPrint(userFacingError(error, fallback: 'Notes refresh failed. Tekrar deneyin.'));
     }
   }
 
@@ -433,9 +466,28 @@ class _MainShellState extends State<MainShell> {
     final repository = _portalRepository;
     if (repository == null || !widget.appState.currentRole.isStaff) return;
     try {
-      widget.appState.replaceBackendCustomers(await repository.loadCustomers());
+      final rows = await repository.loadCustomers();
+      if (mounted) widget.appState.replaceBackendCustomers(rows);
     } catch (error) {
-      debugPrint('Customers refresh failed: $error');
+      debugPrint(userFacingError(error, fallback: 'Customers refresh failed. Tekrar deneyin.'));
+    }
+  }
+
+  Future<void> _refreshMyCustomer() async {
+    final repository = _portalRepository;
+    if (repository == null ||
+        !_backendDataReady ||
+        widget.appState.currentRole.isStaff)
+      return;
+    try {
+      final row = await repository.loadMyCustomer();
+      if (!mounted || row == null) return;
+      setState(
+        () => _customerContractPending = row['contract_status'] == 'pending',
+      );
+      widget.appState.replaceBackendCustomers([row]);
+    } catch (error) {
+      debugPrint(userFacingError(error, fallback: 'Customer refresh failed. Tekrar deneyin.'));
     }
   }
 
@@ -498,9 +550,12 @@ class _MainShellState extends State<MainShell> {
           _backendDataReady = true;
           _backendDataError = null;
         });
+        final pending = _pendingPush;
+        _pendingPush = null;
+        if (pending != null) _openPushNotification(pending);
       }
     } catch (error) {
-      debugPrint('Portal data load failed: $error');
+      debugPrint(userFacingError(error, fallback: 'Portal data load failed. Tekrar deneyin.'));
       if (mounted) {
         setState(() {
           _backendDataReady = true;
@@ -510,17 +565,98 @@ class _MainShellState extends State<MainShell> {
     }
   }
 
+  void _openPushNotification(Map<String, dynamic> payload) {
+    final repository = _portalRepository;
+    if (!mounted || repository == null) return;
+    final recipient = payload['recipient_user_id'];
+    if (recipient != null && recipient != repository.currentUserId) return;
+    if (!_backendDataReady) {
+      _pendingPush = payload;
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final staff = widget.appState.currentRole.isStaff;
+      final type = payload['type']?.toString();
+      final notificationId =
+          payload[staff ? 'staff_notification_id' : 'notification_id']
+              ?.toString();
+      if (notificationId != null) {
+        unawaited(
+          repository.markNotificationRead(notificationId).catchError((
+            Object error,
+          ) {
+            debugPrint(userFacingError(error, fallback: 'Notification read state failed. Tekrar deneyin.'));
+          }),
+        );
+      }
+      if (type == 'message' && payload['ticket_id'] != null) {
+        final ticketId = payload['ticket_id'].toString();
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => Scaffold(
+              backgroundColor: Theme.of(context).colorScheme.surface,
+              appBar: AppBar(title: const Text('Mesajlar')),
+              body: staff
+                  ? AdminSupportInboxScreen(
+                      repository: repository,
+                      initialTicketId: ticketId,
+                    )
+                  : CustomerSupportScreen(
+                      appState: widget.appState,
+                      repository: repository,
+                      initialTicketId: ticketId,
+                    ),
+            ),
+          ),
+        );
+        return;
+      }
+      setState(() {
+        if (staff) {
+          _adminTabIndex = type == 'contract' ? 2 : 0;
+        } else {
+          _customerTabIndex = type == 'contract' ? 4 : 1;
+        }
+      });
+      unawaited(_refreshNotifications());
+      unawaited(_refreshMyCustomer());
+      unawaited(_refreshPortalNotes());
+    });
+  }
+
+  Future<void> _enablePushNotifications() async {
+    try {
+      final enabled = await _pushService?.enable() ?? false;
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            enabled ? 'Bildirimler açık.' : 'Bildirim iznini telefonunuzun uygulama ayarlarından kontrol edin.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Bildirimler etkinleştirilemedi. Tekrar deneyin.'),
+          ),
+        );
+    }
+  }
+
   void _showAiComingSoon() {
-    showCupertinoDialog<void>(
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Demirtürk AI'),
         content: const Padding(
           padding: EdgeInsets.only(top: 8),
           child: Text('Yakında!'),
         ),
         actions: [
-          CupertinoDialogAction(
+          TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Tamam'),
           ),
@@ -538,9 +674,29 @@ class _MainShellState extends State<MainShell> {
           role: widget.appState.currentRole,
           localStaffName: widget.appState.localStaffName,
           onLogout: widget.onLogout,
+          appState: widget.appState,
+          onThemeChanged: _saveThemeMode,
+          repository: _portalRepository,
+          onEnableNotifications: _enablePushNotifications,
         ),
       ),
     );
+  }
+
+  Future<void> _saveThemeMode(ThemeMode mode) async {
+    widget.appState.setThemeMode(mode);
+    try {
+      await _portalRepository?.saveUserPreferences({'theme_mode': mode.name});
+    } catch (error) {
+      debugPrint(userFacingError(error, fallback: 'Appearance preference save failed. Tekrar deneyin.'));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Görünüm tercihi sunucuya kaydedilemedi.'),
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadUserPreferences() async {
@@ -555,7 +711,7 @@ class _MainShellState extends State<MainShell> {
       };
       if (mounted) widget.appState.setThemeMode(mode);
     } catch (error) {
-      debugPrint('Settings load failed: $error');
+      debugPrint(userFacingError(error, fallback: 'Settings load failed. Tekrar deneyin.'));
     }
   }
 
@@ -565,7 +721,9 @@ class _MainShellState extends State<MainShell> {
     final auth = AuthRepository(Supabase.instance.client);
     final passwordController = TextEditingController();
     final confirmController = TextEditingController();
-    final values = await showCupertinoDialog<(String, String)?>(
+    final currentController = TextEditingController();
+    final verifyCurrent = !widget.appState.currentRole.isStaff;
+    final values = await showCupertinoDialog<(String, String, String)?>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
         title: const Text('Yeni parola'),
@@ -574,6 +732,16 @@ class _MainShellState extends State<MainShell> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              if (verifyCurrent) ...[
+                CupertinoTextField(
+                  controller: currentController,
+                  keyboardType: TextInputType.number,
+                  obscureText: true,
+                  maxLength: 6,
+                  placeholder: 'Mevcut parola',
+                ),
+                const SizedBox(height: 8),
+              ],
               CupertinoTextField(
                 controller: passwordController,
                 keyboardType: TextInputType.number,
@@ -601,6 +769,7 @@ class _MainShellState extends State<MainShell> {
             onPressed: () => Navigator.pop(dialogContext, (
               passwordController.text,
               confirmController.text,
+              currentController.text,
             )),
             child: const Text('Güncelle'),
           ),
@@ -609,8 +778,13 @@ class _MainShellState extends State<MainShell> {
     );
     passwordController.dispose();
     confirmController.dispose();
+    currentController.dispose();
     if (values == null) return;
     if (!mounted) return;
+    if (verifyCurrent && values.$3.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mevcut parolanızı girin.')));
+      return;
+    }
     if (!RegExp(r'^\d{6}$').hasMatch(values.$1) || values.$1 != values.$2) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Parolalar aynı ve 6 rakamdan oluşmalı.')),
@@ -618,7 +792,7 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     try {
-      // No reauthentication OTP is requested in this release.
+      if (verifyCurrent) await auth.verifyCurrentPassword(values.$3);
       await auth.updatePassword(values.$1);
       if (mounted) {
         ScaffoldMessenger.of(
@@ -633,7 +807,7 @@ class _MainShellState extends State<MainShell> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Parola değiştirilemedi: $error')),
+          SnackBar(content: Text(userFacingError(error, fallback: 'Parola değiştirilemedi. Tekrar deneyin.'))),
         );
       }
     }
@@ -641,6 +815,7 @@ class _MainShellState extends State<MainShell> {
 
   @override
   void dispose() {
+    unawaited(_pushService?.dispose());
     unawaited(_notificationSubscription?.cancel());
     unawaited(_notesSubscription?.cancel());
     unawaited(_customersSubscription?.cancel());
@@ -1168,15 +1343,23 @@ class _MainShellState extends State<MainShell> {
   }
 
   Widget _buildCustomerBody({required double bottomNavHeight}) {
+    final showProjectShowcase =
+        _customerTabIndex == 0 &&
+        widget.appState.currentCustomer.contractNo.trim().isEmpty;
     final Widget page;
     switch (_customerTabIndex) {
       case 0:
         // Başlangıç
-        page = CustomerHomeScreen(
-          appState: widget.appState,
-          onNavigateTab: _switchCustomerTab,
-          repository: _portalRepository,
-        );
+        page = showProjectShowcase
+            ? CustomerProjectShowcase(
+                bottomPadding: bottomNavHeight,
+                onContact: () => _switchCustomerTab(2),
+              )
+            : CustomerHomeScreen(
+                appState: widget.appState,
+                onNavigateTab: _switchCustomerTab,
+                repository: _portalRepository,
+              );
         break;
       case 1:
         // Ödemelerim
@@ -1213,7 +1396,7 @@ class _MainShellState extends State<MainShell> {
         break;
     }
 
-    final content = _customerContractPending
+    final content = _customerContractPending && !showProjectShowcase
         ? Column(
             children: [
               _buildPendingContractBanner(),
@@ -1296,6 +1479,16 @@ class _MainShellState extends State<MainShell> {
       appState: widget.appState,
       activeTabIndex: _adminTabIndex,
       repository: _portalRepository,
+      onPreviewCustomer: (customer) {
+        final repository = _portalRepository;
+        if (repository == null) return;
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) =>
+                CustomerPreviewScreen(repository: repository, id: customer.id),
+          ),
+        );
+      },
     );
   }
 
@@ -1346,9 +1539,9 @@ class _MainShellState extends State<MainShell> {
             ),
           ),
         ),
-        const GlassCard(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 28),
-          child: SizedBox.shrink(),
+        CustomerContractCard(
+          customer: widget.appState.currentCustomer,
+          repository: _portalRepository,
         ),
         const SizedBox(height: 24),
         Padding(
@@ -1497,13 +1690,7 @@ class _MainShellState extends State<MainShell> {
                         return GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () {
-                            widget.appState.setThemeMode(mode);
-                            unawaited(
-                              _portalRepository?.saveUserPreferences({
-                                    'theme_mode': mode.name,
-                                  }) ??
-                                  Future<void>.value(),
-                            );
+                            unawaited(_saveThemeMode(mode));
                             setState(() {
                               _isThemeMenuOpen = false;
                             });
@@ -1605,6 +1792,14 @@ class _MainShellState extends State<MainShell> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        const CompanyLinksCard(),
+        ListTile(
+          leading: const Icon(Icons.notifications_outlined),
+          title: const Text('Bildirimler'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _enablePushNotifications,
+        ),
         const SizedBox(height: 20),
         Center(
           child: CupertinoButton(
@@ -1653,12 +1848,20 @@ class _StaffProfilePage extends StatelessWidget {
     required this.role,
     required this.localStaffName,
     required this.onLogout,
+    required this.appState,
+    required this.onThemeChanged,
+    required this.repository,
+    required this.onEnableNotifications,
   });
 
   final Future<Map<String, dynamic>?>? profileFuture;
   final UserRole role;
   final String? localStaffName;
   final Future<void> Function() onLogout;
+  final AppState appState;
+  final Future<void> Function(ThemeMode) onThemeChanged;
+  final PortalRepository? repository;
+  final Future<void> Function() onEnableNotifications;
 
   String get _roleLabel => switch (role) {
     UserRole.salesAdvisor => 'Satış Danışmanı',
@@ -1690,7 +1893,7 @@ class _StaffProfilePage extends StatelessWidget {
           child: Icon(CupertinoIcons.back, color: textColor),
         ),
         title: Text(
-          'Profil',
+          'Ayarlar',
           style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
         ),
         centerTitle: true,
@@ -1717,7 +1920,7 @@ class _StaffProfilePage extends StatelessWidget {
                       : 'Ad soyad');
             final staffId = profile?['staff_id']?.toString().trim();
 
-            return Center(
+            return SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 12, 24, 28),
                 child: Column(
@@ -1805,7 +2008,57 @@ class _StaffProfilePage extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 14),
+                    ListenableBuilder(
+                      listenable: appState,
+                      builder: (context, _) => ListTile(
+                        leading: const Icon(Icons.brightness_6_outlined),
+                        title: const Text('Görünüm'),
+                        subtitle: Text(_themeLabel(appState.themeMode)),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () async {
+                          final mode = await showDialog<ThemeMode>(
+                            context: context,
+                            builder: (context) => SimpleDialog(
+                              title: const Text('Görünüm'),
+                              children: [
+                                for (final mode in ThemeMode.values)
+                                  SimpleDialogOption(
+                                    onPressed: () =>
+                                        Navigator.pop(context, mode),
+                                    child: Text(_themeLabel(mode)),
+                                  ),
+                              ],
+                            ),
+                          );
+                          if (mode != null) await onThemeChanged(mode);
+                        },
+                      ),
+                    ),
+                    if ((role == UserRole.management ||
+                            role == UserRole.admin) &&
+                        staffId?.startsWith('Y') == true &&
+                        repository != null)
+                      ListTile(
+                        leading: const Icon(Icons.people_outline),
+                        title: const Text('Diğer hesaplar'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                PortalAccountsScreen(repository: repository!),
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                    const CompanyLinksCard(),
+                    ListTile(
+                      leading: const Icon(Icons.notifications_outlined),
+                      title: const Text('Bildirimler'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: onEnableNotifications,
+                    ),
+                    const SizedBox(height: 20),
                     SizedBox(
                       width: 220,
                       child: CupertinoButton(
@@ -1831,6 +2084,12 @@ class _StaffProfilePage extends StatelessWidget {
       ),
     );
   }
+
+  String _themeLabel(ThemeMode mode) => switch (mode) {
+    ThemeMode.system => 'Sistem',
+    ThemeMode.light => 'Aydınlık',
+    ThemeMode.dark => 'Koyu',
+  };
 }
 
 class _BackendLoadError extends StatelessWidget {

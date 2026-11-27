@@ -126,6 +126,8 @@ class Customer {
   final String? folderName;
   final String? contractDocumentPath;
   final String? contractDocumentName;
+  final bool isPendingContractRecord;
+  final Map<String, String> foldersByOwner;
 
   const Customer({
     required this.id,
@@ -144,6 +146,8 @@ class Customer {
     this.folderName,
     this.contractDocumentPath,
     this.contractDocumentName,
+    this.isPendingContractRecord = false,
+    this.foldersByOwner = const {},
   });
 
   bool get contractPending => contractStatus != 'approved';
@@ -151,6 +155,12 @@ class Customer {
   String get firstName => name.trim().split(RegExp(r'\s+')).first;
 
   String get projectImageAsset {
+    final title = (projectName ?? '').toLowerCase();
+    if (title.contains('asel') && title.contains('4')) return 'assets/images/vitrin-asel4-1.jpg';
+    if (title.contains('asel') && title.contains('3')) return 'assets/images/vitrin-asel3-1.jpg';
+    if (title.contains('asel')) return 'assets/images/vitrin-asel-1.jpg';
+    if (title.contains('yenişehir') || title.contains('yenisehir')) return 'assets/images/vitrin-yenisehir-1.jpg';
+    if (title.contains('almina')) return 'assets/images/vitrin-almina-1.jpg';
     return 'assets/images/demirturk-emblem-dark.png';
   }
 

@@ -1,3 +1,4 @@
+import '../../services/user_facing_error.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,7 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
+import '../../services/upload_policy.dart';
 import '../../utils/turkish_phone_input_formatter.dart';
+import '../../widgets/contract_document_button.dart';
+import '../../widgets/contract_document_upload_button.dart';
 import 'admin_support_inbox_screen.dart';
 import '../../widgets/website_blurred_background.dart';
 import '../customer/customer_support_screen.dart';
@@ -16,11 +20,13 @@ class AdminDashboardScreen extends StatelessWidget {
   final AppState appState;
   final int activeTabIndex;
   final PortalRepository? repository;
+  final ValueChanged<Customer> onPreviewCustomer;
 
   const AdminDashboardScreen({
     super.key,
     required this.appState,
     required this.activeTabIndex,
+    required this.onPreviewCustomer,
     this.repository,
   });
 
@@ -169,11 +175,11 @@ class AdminDashboardScreen extends StatelessWidget {
             Expanded(
               child: Text(
                 'Onay Bekleyen Dekontlar (${verifyingNotes.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
-                  color: Colors.white,
+                  color: AppGlass.textPrimary(context),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -219,21 +225,21 @@ class AdminDashboardScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           customer.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15.5,
                             letterSpacing: -0.3,
-                            color: Colors.white,
+                            color: AppGlass.textPrimary(context),
                           ),
                         ),
                       ),
                       Text(
                         formatCurrency(note.amount),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 16.5,
                           letterSpacing: -0.3,
-                          color: Colors.white,
+                          color: AppGlass.textPrimary(context),
                         ),
                       ),
                     ],
@@ -281,7 +287,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Dekont açılamadı: $error'),
+                                    content: Text(userFacingError(error, fallback: 'Dekont açılamadı. Tekrar deneyin.')),
                                   ),
                                 );
                               }
@@ -385,7 +391,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Onay kaydedilemedi: $error'),
+                                    content: Text(userFacingError(error, fallback: 'Onay kaydedilemedi. Tekrar deneyin.')),
                                   ),
                                 );
                                 return;
@@ -425,11 +431,11 @@ class AdminDashboardScreen extends StatelessWidget {
             Expanded(
               child: Text(
                 'Vadesi Geçmiş Senetler (${overdueNotes.length})',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   letterSpacing: -0.3,
-                  color: Colors.white,
+                  color: AppGlass.textPrimary(context),
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -464,11 +470,11 @@ class AdminDashboardScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           customer.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
                             letterSpacing: -0.3,
-                            color: Colors.white,
+                            color: AppGlass.textPrimary(context),
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -516,7 +522,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Hatırlatma gönderilemedi: $error',
+                                      userFacingError(error, fallback: 'Hatırlatma gönderilemedi. Tekrar deneyin.'),
                                     ),
                                   ),
                                 );
@@ -559,7 +565,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Tahsilat kaydedilemedi: $error',
+                                      userFacingError(error, fallback: 'Tahsilat kaydedilemedi. Tekrar deneyin.'),
                                     ),
                                   ),
                                 );
@@ -595,53 +601,13 @@ class AdminDashboardScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
-        GlassCard(
-          tone: GlassCardTone.infoBlue,
-          borderRadius: 22,
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Yeni Senet / Taksit Planı Oluştur',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                        letterSpacing: -0.3,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Müşteriye tek senet veya sıralı aylık taksit planı tanımlayın',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppGlass.textSecondary(context),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              IosGlassButton(
-                onTap: () => _showCreateInstallmentSheet(context),
-                icon: CupertinoIcons.add,
-                label: 'Senet Ekle',
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
         Text(
           'Tüm Müşteri Senetleri (${notes.length})',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
-            color: Colors.white,
+            color: AppGlass.textPrimary(context),
           ),
         ),
         const SizedBox(height: 10),
@@ -677,11 +643,11 @@ class AdminDashboardScreen extends StatelessWidget {
                     children: [
                       Text(
                         '${customer.name} • ${note.senetNo}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 14,
                           letterSpacing: -0.2,
-                          color: Colors.white,
+                          color: AppGlass.textPrimary(context),
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -700,10 +666,10 @@ class AdminDashboardScreen extends StatelessWidget {
                   children: [
                     Text(
                       formatCurrency(note.amount),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14.5,
-                        color: Colors.white,
+                        color: AppGlass.textPrimary(context),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -726,7 +692,7 @@ class AdminDashboardScreen extends StatelessWidget {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
-                                    'Güncelleme kaydedilemedi: $error',
+                                    userFacingError(error, fallback: 'Güncelleme kaydedilemedi. Tekrar deneyin.'),
                                   ),
                                 ),
                               );
@@ -789,25 +755,25 @@ class AdminDashboardScreen extends StatelessWidget {
 
   Widget _buildCustomersTab(BuildContext context, {bool processOnly = false}) {
     final visibleCustomers = [...appState.customers];
-    visibleCustomers.sort((a, b) {
-      final folderOrder = (a.folderName ?? '').compareTo(b.folderName ?? '');
-      return folderOrder == 0 ? a.name.compareTo(b.name) : folderOrder;
-    });
+    visibleCustomers.sort((a, b) => a.name.compareTo(b.name));
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: WrapAlignment.spaceBetween,
           children: [
             Text(
               processOnly
                   ? 'İnşaat Süreçleri (${appState.customers.length})'
                   : 'Kayıtlı Müşteriler (${appState.customers.length})',
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16.5,
                 fontWeight: FontWeight.w700,
                 letterSpacing: -0.3,
-                color: Colors.white,
+                color: AppGlass.textPrimary(context),
               ),
             ),
             if (!processOnly && appState.currentRole.canManageAllCustomers)
@@ -825,10 +791,26 @@ class AdminDashboardScreen extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
+        if (!processOnly &&
+            repository != null &&
+            appState.currentRole.canManageAllCustomers) ...[
+          Align(
+            alignment: Alignment.centerLeft,
+            child: IosGlassButton(
+              onTap: () => _showAccountLinkReview(context),
+              icon: CupertinoIcons.link,
+              label: 'Bekleyen hesap eşleşmeleri',
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              borderRadius: 18,
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         if (!processOnly && repository != null)
-          _CustomerFolderManager(
+          CustomerFolderManager(
             repository: repository!,
             customers: visibleCustomers,
+            onOpenCustomer: onPreviewCustomer,
           ),
         ...visibleCustomers.map((c) {
           final total = appState.getCustomerTotalAmount(c.id);
@@ -862,11 +844,11 @@ class AdminDashboardScreen extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        c.name.substring(0, 1),
-                        style: const TextStyle(
+                        c.name.isEmpty ? '?' : c.name.characters.first,
+                        style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
-                          color: Colors.white,
+                          color: AppGlass.textPrimary(context),
                         ),
                       ),
                     ),
@@ -877,20 +859,32 @@ class AdminDashboardScreen extends StatelessWidget {
                         children: [
                           Text(
                             c.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
                               letterSpacing: -0.3,
-                              color: Colors.white,
+                              color: AppGlass.textPrimary(context),
                             ),
                           ),
                           Text(
-                            '${c.folderName == null ? '' : '[${c.folderName}] • '}${c.contractNo.isEmpty ? 'Sözleşme bekliyor' : 'Sözleşme: ${c.contractNo}'} • Tel: ${c.phone}',
+                            '${c.contractNo.isEmpty ? 'Sözleşme bekliyor' : 'Sözleşme: ${c.contractNo}'} • Tel: ${c.phone}',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppGlass.textMuted(context),
                             ),
                           ),
+                          if (c.projectName?.isNotEmpty == true)
+                            Text(
+                              [
+                                c.projectName!,
+                                if (c.unitLabel?.isNotEmpty == true)
+                                  c.unitLabel!,
+                              ].join(' · '),
+                              style: TextStyle(
+                                color: AppGlass.textSecondary(context),
+                                fontSize: 12,
+                              ),
+                            ),
                           if (c.contractPending ||
                               (c.projectStatus?.trim().isNotEmpty ??
                                   false)) ...[
@@ -912,27 +906,16 @@ class AdminDashboardScreen extends StatelessWidget {
                     CupertinoButton(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: Size.zero,
-                      onPressed: () {
-                        appState.selectCustomer(c.id);
-                        appState.setRole(UserRole.customer);
-                      },
-                      child: const Row(
-                        children: [
-                          Text(
-                            'Müşteri Ekranı',
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64D2FF),
-                            ),
-                          ),
-                          SizedBox(width: 3),
-                          Icon(
+                      onPressed: c.isPendingContractRecord
+                          ? null
+                          : () => onPreviewCustomer(c),
+                      child: const Tooltip(
+                        message: 'Müşteri ekranına geç',
+                        child: Icon(
                             CupertinoIcons.chevron_forward,
-                            size: 13,
+                            size: 20,
                             color: Color(0xFF64D2FF),
                           ),
-                        ],
                       ),
                     ),
                   ],
@@ -944,11 +927,29 @@ class AdminDashboardScreen extends StatelessWidget {
                     color: AppGlass.dividerColor(context),
                   ),
                 ),
-                if (repository != null)
-                  _CustomerFolderAssignment(
+                if (!processOnly &&
+                    repository != null &&
+                    !c.isPendingContractRecord)
+                  CustomerFolderAssignment(
                     repository: repository!,
                     customer: c,
+                    onChanged: _refreshCustomers,
                   ),
+                if (!processOnly && repository != null) ...[
+                  if (c.contractPending &&
+                      appState.currentRole.canManageAllCustomers)
+                    TextButton.icon(
+                      onPressed: () =>
+                          _showAccountLinkReview(context, customer: c),
+                      icon: const Icon(CupertinoIcons.doc_text_search),
+                      label: const Text('Sözleşmeyi gör ve onayla'),
+                    )
+                  else if (c.contractDocumentPath != null)
+                    ContractDocumentButton(
+                      repository: repository!,
+                      customerId: c.id,
+                    ),
+                ],
                 if (appState.currentRole.canSeePromissoryNotes)
                   Row(
                     children: [
@@ -957,7 +958,7 @@ class AdminDashboardScreen extends StatelessWidget {
                           context,
                           'Toplam Senet',
                           formatCurrency(total),
-                          Colors.white,
+                          AppGlass.textPrimary(context),
                         ),
                       ),
                       Expanded(
@@ -994,11 +995,11 @@ class AdminDashboardScreen extends StatelessWidget {
       children: [
         Text(
           'Müşteri Destek & İletişim Talepleri (${tickets.length})',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 16.5,
             fontWeight: FontWeight.w700,
             letterSpacing: -0.3,
-            color: Colors.white,
+            color: AppGlass.textPrimary(context),
           ),
         ),
         const SizedBox(height: 12),
@@ -1077,11 +1078,11 @@ class AdminDashboardScreen extends StatelessWidget {
                         const SizedBox(height: 5),
                         Text(
                           ticket.subject,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 14.5,
                             letterSpacing: -0.2,
-                            color: Colors.white,
+                            color: AppGlass.textPrimary(context),
                           ),
                         ),
                         if (lastMsg != null) ...[
@@ -1216,23 +1217,26 @@ class AdminDashboardScreen extends StatelessWidget {
                   const SizedBox(height: 14),
                   Text(
                     '$senetNo Dekontunu Reddet',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16.5,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                      color: AppGlass.textPrimary(context),
                     ),
                   ),
                   const SizedBox(height: 12),
                   CupertinoTextField(
                     controller: reasonCtrl,
                     maxLines: 2,
-                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                    style: TextStyle(
+                      color: AppGlass.textPrimary(context),
+                      fontSize: 14,
+                    ),
                     padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: AppGlass.subtleSurface(context),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.25),
+                        color: AppGlass.dividerColor(context),
                         width: 0.7,
                       ),
                     ),
@@ -1270,7 +1274,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 if (!context.mounted) return;
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Ret kaydedilemedi: $error'),
+                                    content: Text(userFacingError(error, fallback: 'Ret kaydedilemedi. Tekrar deneyin.')),
                                   ),
                                 );
                                 return;
@@ -1291,287 +1295,18 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  void _showCreateInstallmentSheet(BuildContext context) {
-    if (appState.customers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Önce bir müşteri kaydı oluşturun.')),
-      );
-      return;
-    }
-    String selectedCustomerId = appState.customers.first.id;
-    final amountCtrl = TextEditingController(text: '30000');
-    final descCtrl = TextEditingController(text: 'Yeni Sözleşme Senet Planı');
-    int installmentCount = 6;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: IosGlassSheet(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 26),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Yeni Senet / Taksit Planı Tanımla',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Müşteri Seçin',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: appState.customers.map((c) {
-                          final active = c.id == selectedCustomerId;
-                          return CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            onPressed: () =>
-                                setModalState(() => selectedCustomerId = c.id),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? const Color(0xFF0A84FF)
-                                          .withValues(alpha: 0.85)
-                                    : Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: active
-                                      ? Colors.white.withValues(alpha: 0.6)
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: 0.7,
-                                ),
-                              ),
-                              child: Text(
-                                c.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Her Senet Tutarı (₺)',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      CupertinoTextField(
-                        controller: amountCtrl,
-                        keyboardType: TextInputType.number,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.24),
-                            width: 0.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Senet Adedi (Ay)',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 8,
-                        children: [1, 3, 6, 12, 18, 24].map((cnt) {
-                          final active = cnt == installmentCount;
-                          return CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            onPressed: () =>
-                                setModalState(() => installmentCount = cnt),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 13,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: active
-                                    ? const Color(0xFF0A84FF)
-                                          .withValues(alpha: 0.85)
-                                    : Colors.white.withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: active
-                                      ? Colors.white.withValues(alpha: 0.6)
-                                      : Colors.white.withValues(alpha: 0.2),
-                                  width: 0.7,
-                                ),
-                              ),
-                              child: Text(
-                                '$cnt Ay',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Sözleşme / Senet Açıklaması',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      CupertinoTextField(
-                        controller: descCtrl,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                        ),
-                        padding: const EdgeInsets.all(13),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.24),
-                            width: 0.7,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      SizedBox(
-                        width: double.infinity,
-                        child: IosGlassButton(
-                          icon: CupertinoIcons.checkmark_alt_circle_fill,
-                          label: 'Senet Planını Oluştur',
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          onTap: () async {
-                            final amount =
-                                double.tryParse(amountCtrl.text.trim()) ??
-                                25000.0;
-                            if (repository == null) {
-                              appState.createInstallmentPlan(
-                                customerId: selectedCustomerId,
-                                monthlyAmount: amount,
-                                installmentCount: installmentCount,
-                                firstDueDate: DateTime(2026, 12, 15),
-                                descriptionPrefix: descCtrl.text.trim().isEmpty
-                                    ? 'Senet Ödemesi'
-                                    : descCtrl.text.trim(),
-                              );
-                            } else {
-                              try {
-                                await repository!.createInstallmentPlan(
-                                  customerId: selectedCustomerId,
-                                  monthlyAmount: amount,
-                                  installmentCount: installmentCount,
-                                  firstDueDate: DateTime(2026, 12, 15),
-                                  descriptionPrefix:
-                                      descCtrl.text.trim().isEmpty
-                                      ? 'Senet Ödemesi'
-                                      : descCtrl.text.trim(),
-                                );
-                              } catch (error) {
-                                if (!context.mounted) return;
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Senet planı kaydedilemedi: $error',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
-                            }
-                            if (!ctx.mounted || !context.mounted) return;
-                            Navigator.pop(ctx);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                backgroundColor: const Color(0xFF059669),
-                                content: Text(
-                                  '$installmentCount adet yeni senet başarıyla oluşturuldu!',
-                                ),
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
   void _showAddCustomerSheet(BuildContext context) {
     final nameCtrl = TextEditingController();
     final phoneCtrl = TextEditingController();
     final nameFocus = FocusNode();
     final phoneFocus = FocusNode();
+    String projectName = '';
+    String unitLabel = '';
     String? advisorId;
     PlatformFile? contractFile;
     Uint8List? contractFileBytes;
     bool saving = false;
+    final advisorsFuture = repository?.loadSalesAdvisors();
 
     showModalBottomSheet(
       context: context,
@@ -1601,17 +1336,18 @@ class AdminDashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    const Text(
+                    Text(
                       'Yeni Müşteri Cari Kaydı Oluştur',
                       style: TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w700,
                         letterSpacing: -0.3,
-                        color: Colors.white,
+                        color: AppGlass.textPrimary(ctx),
                       ),
                     ),
                     const SizedBox(height: 14),
                     _buildSheetInput(
+                      ctx,
                       controller: nameCtrl,
                       focusNode: nameFocus,
                       nextFocusNode: phoneFocus,
@@ -1619,21 +1355,36 @@ class AdminDashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     _buildSheetInput(
+                      ctx,
                       controller: phoneCtrl,
                       focusNode: phoneFocus,
                       placeholder: '5XX XXX XX XX',
                       keyboardType: TextInputType.phone,
                       inputFormatters: [TurkishPhoneInputFormatter()],
                     ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      decoration: const InputDecoration(labelText: 'Proje adı'),
+                      textCapitalization: TextCapitalization.words,
+                      textInputAction: TextInputAction.next,
+                      inputFormatters: [LengthLimitingTextInputFormatter(120)],
+                      onChanged: (value) => projectName = value.trim(),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      decoration: const InputDecoration(
+                        labelText: 'Blok / daire (isteğe bağlı)',
+                      ),
+                      inputFormatters: [LengthLimitingTextInputFormatter(80)],
+                      onChanged: (value) => unitLabel = value.trim(),
+                    ),
                     const SizedBox(height: 12),
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.07),
+                        color: AppGlass.subtleSurface(ctx),
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.18),
-                        ),
+                        border: Border.all(color: AppGlass.dividerColor(ctx)),
                       ),
                       child: CupertinoButton(
                         padding: const EdgeInsets.all(13),
@@ -1649,7 +1400,8 @@ class AdminDashboardScreen extends StatelessWidget {
                                   ],
                                 );
                                 if (picked == null) return;
-                                final bytes = await picked.readAsBytes();
+                                final bytes = await UploadPolicy.readFile(picked, UploadPolicy.contractBytes);
+                                if (!ctx.mounted || !context.mounted) return;
                                 if (bytes.isEmpty) {
                                   if (ctx.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
@@ -1678,11 +1430,11 @@ class AdminDashboardScreen extends StatelessWidget {
                             Expanded(
                               child: Text(
                                 contractFile?.name ??
-                                    'Sözleşme dosyası seç (PDF / Word) *',
+                                    'Sözleşme dosyası seç (PDF / Word)',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
+                                style: TextStyle(
+                                  color: AppGlass.textPrimary(ctx),
                                   fontSize: 12.5,
                                 ),
                               ),
@@ -1699,9 +1451,7 @@ class AdminDashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 14),
                     FutureBuilder<List<Map<String, dynamic>>>(
-                      future:
-                          repository?.loadSalesAdvisors() ??
-                          Future.value(const <Map<String, dynamic>>[]),
+                      future: advisorsFuture,
                       builder: (context, snapshot) {
                         final advisors = snapshot.data ?? const [];
                         if (snapshot.connectionState ==
@@ -1723,12 +1473,8 @@ class AdminDashboardScreen extends StatelessWidget {
                               children: [
                                 DropdownButtonFormField<String>(
                                   initialValue: advisorId,
-                                  dropdownColor: const Color(0xFF242220),
                                   decoration: const InputDecoration(
                                     labelText: 'Atanan satış danışmanı',
-                                    labelStyle: TextStyle(
-                                      color: Color(0xFFCDC8C0),
-                                    ),
                                   ),
                                   items: advisors.map((advisor) {
                                     final staffId =
@@ -1746,8 +1492,8 @@ class AdminDashboardScreen extends StatelessWidget {
                                 const SizedBox(height: 6),
                                 Text(
                                   'Sözleşme numarası otomatik verilir. İlk numara: S/${contractYear}000001; numara sırayla artar.',
-                                  style: const TextStyle(
-                                    color: Color(0xFFA9A39A),
+                                  style: TextStyle(
+                                    color: AppGlass.textSecondary(ctx),
                                     fontSize: 11.5,
                                   ),
                                 ),
@@ -1770,13 +1516,14 @@ class AdminDashboardScreen extends StatelessWidget {
                           final phone = phoneCtrl.text.trim();
                           final file = contractFile;
                           if (name.isEmpty ||
+                              projectName.isEmpty ||
                               !_isValidTurkishPhone(phone) ||
                               advisorId == null ||
                               (file != null && contractFileBytes == null)) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text(
-                                  'Ad, telefon ve danışman zorunludur. Sözleşme dosyası isteğe bağlıdır.',
+                                  'Ad, telefon, proje ve danışman zorunludur.',
                                 ),
                               ),
                             );
@@ -1812,15 +1559,14 @@ class AdminDashboardScreen extends StatelessWidget {
                                   phone: phone,
                                   assignedAdvisorId: advisorId!,
                                   contractDate: DateTime.now(),
+                                  projectName: projectName,
+                                  unitLabel: unitLabel,
                                   contractFileName: file?.name,
                                   contractFileBytes: contractFileBytes,
                                   contractContentType: file == null
                                       ? null
                                       : contentType,
                                 );
-                            appState.replaceBackendCustomers(
-                              await repository!.loadCustomers(),
-                            );
                             if (!ctx.mounted || !context.mounted) return;
                             Navigator.pop(ctx);
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -1832,6 +1578,7 @@ class AdminDashboardScreen extends StatelessWidget {
                                 ),
                               ),
                             );
+                            await _refreshCustomers();
                             return;
                           } catch (error) {
                             if (ctx.mounted) {
@@ -1841,7 +1588,7 @@ class AdminDashboardScreen extends StatelessWidget {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  'Müşteri Supabase’e gönderilemedi: $error',
+                                  userFacingError(error, fallback: 'Müşteri Supabase’e gönderilemedi. Tekrar deneyin.'),
                                 ),
                               ),
                             );
@@ -1860,7 +1607,8 @@ class AdminDashboardScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSheetInput({
+  Widget _buildSheetInput(
+    BuildContext context, {
     required TextEditingController controller,
     required String placeholder,
     FocusNode? focusNode,
@@ -1891,28 +1639,49 @@ class AdminDashboardScreen extends StatelessWidget {
               padding: const EdgeInsets.only(left: 13, right: 8),
               child: Text(
                 prefixText,
-                style: const TextStyle(
-                  color: Colors.white,
+                style: TextStyle(
+                  color: AppGlass.textPrimary(context),
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                 ),
               ),
             ),
       placeholderStyle: TextStyle(
-        color: Colors.white.withValues(alpha: 0.45),
+        color: AppGlass.textMuted(context),
         fontSize: 13.5,
       ),
-      style: const TextStyle(color: Colors.white, fontSize: 14),
+      style: TextStyle(color: AppGlass.textPrimary(context), fontSize: 14),
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: AppGlass.subtleSurface(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.24),
-          width: 0.7,
-        ),
+        border: Border.all(color: AppGlass.dividerColor(context), width: 0.7),
       ),
     );
+  }
+
+  Future<void> _refreshCustomers() async {
+    final currentRepository = repository;
+    if (currentRepository == null) return;
+    try {
+      appState.replaceBackendCustomers(await currentRepository.loadCustomers());
+    } catch (error) {
+      debugPrint(userFacingError(error, fallback: 'Customers refresh failed. Tekrar deneyin.'));
+    }
+  }
+
+  Future<void> _showAccountLinkReview(
+    BuildContext context, {
+    Customer? customer,
+  }) async {
+    final currentRepository = repository;
+    if (currentRepository == null) return;
+    await showContractAccountReview(
+      context,
+      repository: currentRepository,
+      customer: customer,
+    );
+    if (context.mounted) await _refreshCustomers();
   }
 
   bool _isValidTurkishPhone(String value) {
@@ -1922,194 +1691,546 @@ class AdminDashboardScreen extends StatelessWidget {
   }
 }
 
-class _CustomerFolderManager extends StatefulWidget {
-  const _CustomerFolderManager({
+Future<void> showContractAccountReview(
+  BuildContext context, {
+  required PortalRepository repository,
+  Customer? customer,
+  String? delegatedAccountId,
+}) => showModalBottomSheet<void>(
+  context: context,
+  isScrollControlled: true,
+  backgroundColor: Colors.transparent,
+  builder: (_) => _PendingAccountLinksSheet(
+    repository: repository,
+    customer: customer,
+    delegatedAccountId: delegatedAccountId,
+  ),
+);
+
+class CustomerFolderManager extends StatefulWidget {
+  const CustomerFolderManager({
+    super.key,
     required this.repository,
     required this.customers,
+    required this.onOpenCustomer,
+    this.delegatedAccountId,
   });
 
   final PortalRepository repository;
   final List<Customer> customers;
+  final ValueChanged<Customer> onOpenCustomer;
+  final String? delegatedAccountId;
 
   @override
-  State<_CustomerFolderManager> createState() => _CustomerFolderManagerState();
+  State<CustomerFolderManager> createState() => _CustomerFolderManagerState();
 }
 
-class _CustomerFolderManagerState extends State<_CustomerFolderManager> {
+class _CustomerFolderManagerState extends State<CustomerFolderManager> {
   late Future<List<Map<String, dynamic>>> _folders = widget.repository
-      .loadCustomerFolders();
+      .loadCustomerFolders(ownerId: widget.delegatedAccountId);
+
+  void _reload() => setState(
+    () => _folders = widget.repository.loadCustomerFolders(
+      ownerId: widget.delegatedAccountId,
+    ),
+  );
 
   Future<void> _createFolder() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
+    String name = '';
+    final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Klasör oluştur'),
         content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Klasör adı'),
+          autofocus: true,
+          textCapitalization: TextCapitalization.sentences,
+          inputFormatters: [LengthLimitingTextInputFormatter(80)],
+          decoration: const InputDecoration(labelText: 'Klasör adı'),
+          onChanged: (value) => name = value.trim(),
+          onSubmitted: (_) => Navigator.pop(context, true),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text('Vazgeç'),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Oluştur'),
           ),
         ],
       ),
     );
-    if (name == null || name.isEmpty) return;
+    if (approved != true || name.isEmpty || !mounted) return;
     try {
-      await widget.repository.createCustomerFolder(name);
-      if (mounted) {
-        setState(() => _folders = widget.repository.loadCustomerFolders());
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Klasör oluşturulamadı: $error')),
+      final delegatedAccountId = widget.delegatedAccountId;
+      if (delegatedAccountId == null) {
+        await widget.repository.createCustomerFolder(name);
+      } else {
+        await widget.repository.performPortalAccountAction(
+          delegatedAccountId,
+          'create_folder',
+          {'name': name},
         );
       }
+      if (mounted) _reload();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Klasör oluşturulamadı.')));
     }
-  }
-
-  @override
-  Widget build(
-    BuildContext context,
-  ) => FutureBuilder<List<Map<String, dynamic>>>(
-    future: _folders,
-    builder: (context, snapshot) {
-      final folders = snapshot.data ?? const [];
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${widget.customers.length} müşteri • klasör ve ada göre sıralı',
-                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 12),
-              ),
-            ),
-            CupertinoButton(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              onPressed: _createFolder,
-              child: const Text(
-                '+ Klasör',
-                style: TextStyle(color: Color(0xFF64D2FF)),
-              ),
-            ),
-            if (folders.isNotEmpty)
-              Text(
-                '${folders.length} klasör',
-                style: const TextStyle(color: Color(0xFFA9A39A), fontSize: 11),
-              ),
-          ],
-        ),
-      );
-    },
-  );
-}
-
-class _CustomerFolderAssignment extends StatefulWidget {
-  const _CustomerFolderAssignment({
-    required this.repository,
-    required this.customer,
-  });
-  final PortalRepository repository;
-  final Customer customer;
-
-  @override
-  State<_CustomerFolderAssignment> createState() =>
-      _CustomerFolderAssignmentState();
-}
-
-class _CustomerFolderAssignmentState extends State<_CustomerFolderAssignment> {
-  late Future<List<Map<String, dynamic>>> _folders;
-  String? _folderId;
-
-  @override
-  void initState() {
-    super.initState();
-    _folders = widget.repository.loadCustomerFolders();
-    _folderId = widget.customer.folderId;
   }
 
   @override
   Widget build(BuildContext context) =>
       FutureBuilder<List<Map<String, dynamic>>>(
         future: _folders,
-        builder: (context, snapshot) {
-          final folders = snapshot.data ?? const [];
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 6),
-              child: SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 1.5),
-              ),
-            );
-          }
-          if (folders.isEmpty) {
-            return CupertinoButton(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              minimumSize: Size.zero,
-              onPressed: () => setState(
-                () => _folders = widget.repository.loadCustomerFolders(),
-              ),
-              child: const Text(
-                'Klasörleri yenile',
-                style: TextStyle(color: Color(0xFF64D2FF), fontSize: 11),
-              ),
-            );
-          }
-          return Align(
-            alignment: Alignment.centerLeft,
-            child: DropdownButton<String?>(
-              value: folders.any((folder) => folder['id'] == _folderId)
-                  ? _folderId
-                  : null,
-              hint: const Text(
-                'Klasöre ekle',
-                style: TextStyle(color: Color(0xFF64D2FF), fontSize: 12),
-              ),
-              dropdownColor: const Color(0xFF242220),
-              underline: const SizedBox.shrink(),
-              items: [
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('Klasörsüz'),
-                ),
-                ...folders.map(
-                  (folder) => DropdownMenuItem<String?>(
-                    value: folder['id'].toString(),
-                    child: Text(folder['name'].toString()),
+        builder: (context, snapshot) => GlassCard(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Klasörler',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
-                ),
-              ],
-              onChanged: (value) async {
-                setState(() => _folderId = value);
-                try {
-                  await widget.repository.assignCustomerFolder(
-                    customerId: widget.customer.id,
-                    folderId: value,
-                  );
-                } catch (error) {
-                  if (!context.mounted) return;
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Klasör ataması yapılamadı: $error'),
-                      ),
-                    );
-                  }
-                }
-              },
-            ),
-          );
-        },
+                  TextButton.icon(
+                    onPressed: _createFolder,
+                    icon: const Icon(Icons.create_new_folder_outlined),
+                    label: const Text('Klasör oluştur'),
+                  ),
+                ],
+              ),
+              if (snapshot.hasError)
+                TextButton(
+                  onPressed: _reload,
+                  child: const Text('Klasörleri yeniden yükle'),
+                )
+              else if (!snapshot.hasData)
+                const LinearProgressIndicator()
+              else
+                for (final folder in snapshot.data!)
+                  _buildFolder(context, folder),
+            ],
+          ),
+        ),
       );
+
+  Widget _buildFolder(BuildContext context, Map<String, dynamic> folder) {
+    final ownerId = folder['created_by'].toString();
+    final members = widget.customers
+        .where((customer) => customer.foldersByOwner[ownerId] == folder['id'])
+        .toList();
+    final owner = folder['profiles'] as Map?;
+    return ExpansionTile(
+      key: PageStorageKey('customer-folder-${folder['id']}'),
+      tilePadding: const EdgeInsets.symmetric(horizontal: 4),
+      leading: const Icon(Icons.folder_outlined),
+      title: Text(folder['name'].toString()),
+      subtitle: Text(
+        [
+          if (ownerId != widget.repository.currentUserId &&
+              owner?['full_name'] != null)
+            owner!['full_name'].toString(),
+          '${members.length} müşteri',
+        ].join(' · '),
+      ),
+      children: [
+        if (members.isEmpty)
+          const ListTile(dense: true, title: Text('Bu klasör boş.')),
+        for (final customer in members)
+          ListTile(
+            dense: true,
+            leading: const Icon(Icons.person_outline),
+            title: Text(customer.name),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => widget.onOpenCustomer(customer),
+          ),
+      ],
+    );
+  }
+}
+
+class CustomerFolderAssignment extends StatefulWidget {
+  const CustomerFolderAssignment({
+    super.key,
+    required this.repository,
+    required this.customer,
+    required this.onChanged,
+    this.delegatedAccountId,
+  });
+
+  final PortalRepository repository;
+  final Customer customer;
+  final Future<void> Function() onChanged;
+  final String? delegatedAccountId;
+
+  @override
+  State<CustomerFolderAssignment> createState() =>
+      _CustomerFolderAssignmentState();
+}
+
+class _CustomerFolderAssignmentState extends State<CustomerFolderAssignment> {
+  bool _busy = false;
+  String? get _ownerId =>
+      widget.delegatedAccountId ?? widget.repository.currentUserId;
+
+  Future<void> _chooseFolder() async {
+    setState(() => _busy = true);
+    try {
+      final currentFolderId = widget.customer.foldersByOwner[_ownerId];
+      final folders = await widget.repository.loadCustomerFolders(
+        ownerId: _ownerId,
+      );
+      if (!mounted) return;
+      final selection = await showDialog<({String? id})>(
+        context: context,
+        builder: (context) => SimpleDialog(
+          title: const Text('Kişisel klasör seç'),
+          children: [
+            if (folders.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('Önce bir klasör oluşturun.'),
+              ),
+            if (currentFolderId != null)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(context, (id: null)),
+                child: const Text('Klasörden çıkar'),
+              ),
+            for (final folder in folders)
+              SimpleDialogOption(
+                onPressed: () =>
+                    Navigator.pop(context, (id: folder['id'].toString())),
+                child: Text(folder['name'].toString()),
+              ),
+          ],
+        ),
+      );
+      if (selection == null || !mounted) return;
+      final accountId = widget.delegatedAccountId;
+      if (accountId == null) {
+        await widget.repository.assignCustomerFolder(
+          customerId: widget.customer.id,
+          folderId: selection.id,
+        );
+      } else {
+        await widget.repository.performPortalAccountAction(
+          accountId,
+          'assign_folder',
+          {'customer_id': widget.customer.id, 'folder_id': selection.id},
+        );
+      }
+      await widget.onChanged();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Klasör ataması yapılamadı.')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    onPressed: _busy ? null : _chooseFolder,
+    icon: const Icon(Icons.drive_file_move_outline),
+    label: Text(
+      widget.customer.foldersByOwner.containsKey(_ownerId)
+          ? 'Klasörü değiştir'
+          : 'Klasöre ekle',
+    ),
+  );
+}
+
+class _PendingAccountLinksSheet extends StatefulWidget {
+  const _PendingAccountLinksSheet({
+    required this.repository,
+    this.customer,
+    this.delegatedAccountId,
+  });
+
+  final PortalRepository repository;
+  final Customer? customer;
+  final String? delegatedAccountId;
+
+  @override
+  State<_PendingAccountLinksSheet> createState() =>
+      _PendingAccountLinksSheetState();
+}
+
+class _PendingAccountLinksSheetState extends State<_PendingAccountLinksSheet> {
+  List<Map<String, dynamic>> _matches = const [];
+  bool _loading = true;
+  String? _error;
+  String? _linkingAccountId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMatches();
+  }
+
+  Future<void> _loadMatches() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final matches = await widget.repository.loadPendingAccountLinks();
+      if (!mounted) return;
+      setState(() {
+        final id = widget.customer?.id;
+        _matches = matches.where((match) {
+          if (id == null) return true;
+          return (match['account'] as Map)['id'] == id ||
+              (match['contract'] as Map)['id'] == id;
+        }).toList();
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = userFacingError(error, fallback: 'Hesap eşleşmeleri alınamadı. Tekrar deneyin.');
+      });
+    }
+  }
+
+  Future<void> _link(Map<String, dynamic> match) async {
+    final account = match['account'] as Map<String, dynamic>;
+    final contract = match['contract'] as Map<String, dynamic>;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hesabı sözleşmeye bağla'),
+        content: Text(
+          '${match['phone']} numaralı hesabı ${contract['full_name']} adına kayıtlı '
+          '${contract['contract_number'] ?? 'bekleyen'} sözleşmesine bağlamak üzeresiniz. '
+          'SMS doğrulaması kullanılmadığı için kişinin kimliğini ayrıca kontrol ettiğinizi onaylayın.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Kimliği kontrol ettim, bağla'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+
+    final accountId = account['id'].toString();
+    setState(() => _linkingAccountId = accountId);
+    try {
+      final delegatedAccountId = widget.delegatedAccountId;
+      if (delegatedAccountId != null) {
+        await widget.repository.performPortalAccountAction(
+          delegatedAccountId,
+          'link_contract',
+          {
+            'contract_id': contract['id'],
+            'customer_id': accountId,
+            'pending': contract['_pending_contract_record'] == true,
+          },
+        );
+      } else if (contract['_pending_contract_record'] == true) {
+        await widget.repository.linkPendingContractAccount(
+          pendingContractId: contract['id'].toString(),
+          accountCustomerId: accountId,
+        );
+      } else {
+        await widget.repository.linkCustomerAccount(
+          contractCustomerId: contract['id'].toString(),
+          accountCustomerId: accountId,
+        );
+      }
+      if (!mounted) return;
+      setState(
+        () => _matches.removeWhere(
+          (item) =>
+              (item['account'] as Map<String, dynamic>)['id'] == accountId,
+        ),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Hesap sözleşmeye bağlandı.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(userFacingError(error, fallback: 'Hesap bağlanamadı. Tekrar deneyin.'))));
+    } finally {
+      if (mounted) setState(() => _linkingAccountId = null);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: MediaQuery.sizeOf(context).height * 0.76,
+        padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppGlass.dividerColor(context),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              widget.customer == null
+                  ? 'Bekleyen hesap eşleşmeleri'
+                  : 'Sözleşmeyi gör ve onayla',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Eşleşme numaraya göre bulunur. Numara tek başına kimlik kanıtı değildir; her hesabı ayrıca kontrol edin.',
+              style: TextStyle(
+                color: AppGlass.textSecondary(context),
+                fontSize: 12.5,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.redAccent),
+                      ),
+                    )
+                  : _matches.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Text('Bağlanmayı bekleyen eşleşme bulunamadı.'),
+                          if (widget.customer case final customer?
+                              when customer.contractDocumentPath != null)
+                            ContractDocumentButton(
+                              repository: widget.repository,
+                              customerId: customer.id,
+                              pending: customer.isPendingContractRecord,
+                            ),
+                        ],
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: _matches.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final match = _matches[index];
+                        final account =
+                            match['account'] as Map<String, dynamic>;
+                        final contract =
+                            match['contract'] as Map<String, dynamic>;
+                        final linkedDocument =
+                            contract['customer_contract_documents'];
+                        final hasDocument =
+                            contract['storage_path'] != null ||
+                            (linkedDocument is Map &&
+                                linkedDocument.isNotEmpty) ||
+                            (linkedDocument is List &&
+                                linkedDocument.isNotEmpty);
+                        final isLinking =
+                            _linkingAccountId == account['id'].toString();
+                        return Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppGlass.subtleSurface(context),
+                            border: Border.all(
+                              color: AppGlass.dividerColor(context),
+                            ),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${account['full_name']} · ${match['phone']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                '${contract['full_name']} · ${contract['contract_number']}',
+                                style: TextStyle(
+                                  color: AppGlass.textSecondary(context),
+                                ),
+                              ),
+                              if (hasDocument)
+                                ContractDocumentButton(
+                                  repository: widget.repository,
+                                  customerId: contract['id'].toString(),
+                                  pending:
+                                      contract['_pending_contract_record'] ==
+                                      true,
+                                )
+                              else ...[
+                                const Text('Sözleşme dosyası eklenmemiş.'),
+                                if (contract['_pending_contract_record'] == true)
+                                  ContractDocumentUploadButton(
+                                    repository: widget.repository,
+                                    contractId: contract['id'].toString(),
+                                    onSaved: _loadMatches,
+                                  ),
+                              ],
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.icon(
+                                  onPressed: _linkingAccountId == null && hasDocument
+                                      ? () => _link(match)
+                                      : null,
+                                  icon: isLinking
+                                      ? const SizedBox(
+                                          width: 16,
+                                          height: 16,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(CupertinoIcons.link),
+                                  label: const Text(
+                                    'Kimliği kontrol ettim, hesabı bağla',
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

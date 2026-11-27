@@ -10,11 +10,13 @@ import 'iban_and_statement_sheets.dart';
 class CustomerNotesScreen extends StatelessWidget {
   final AppState appState;
   final PortalRepository? repository;
+  final bool readOnly;
 
   const CustomerNotesScreen({
     super.key,
     required this.appState,
     this.repository,
+    this.readOnly = false,
   });
 
   @override
@@ -49,23 +51,26 @@ class CustomerNotesScreen extends StatelessWidget {
           GlassCard(
             borderRadius: 22,
             padding: const EdgeInsets.all(18),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(CupertinoIcons.doc_text_search, color: Color(0xFFFF9F0A)),
-                SizedBox(height: 10),
+                const Icon(
+                  CupertinoIcons.doc_text_search,
+                  color: Color(0xFFFF9F0A),
+                ),
+                const SizedBox(height: 10),
                 Text(
                   'Sözleşmeniz onay bekliyor',
                   style: TextStyle(
-                    color: Colors.white,
+                    color: AppGlass.textPrimary(context),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   'Senet ve ödeme bilgileriniz sözleşmeniz onaylandığında burada yer alacak.',
                   style: TextStyle(
-                    color: Color(0xFFA9A39A),
+                    color: AppGlass.textSecondary(context),
                     fontSize: 12.5,
                     height: 1.45,
                   ),
@@ -278,16 +283,18 @@ class CustomerNotesScreen extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GestureDetector(
-                    onTap: () {
-                      if (note.status != NoteStatus.paid) {
-                        showUploadReceiptSheet(
-                          context,
-                          appState,
-                          repository: repository,
-                          preselectedNote: note,
-                        );
-                      }
-                    },
+                    onTap: readOnly
+                        ? null
+                        : () {
+                            if (note.status != NoteStatus.paid) {
+                              showUploadReceiptSheet(
+                                context,
+                                appState,
+                                repository: repository,
+                                preselectedNote: note,
+                              );
+                            }
+                          },
                     child: Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(

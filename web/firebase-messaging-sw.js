@@ -4,11 +4,11 @@ importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-app-compat.js'
 importScripts('https://www.gstatic.com/firebasejs/12.0.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: 'YOUR_FIREBASE_API_KEY',
-  authDomain: 'YOUR_FIREBASE_PROJECT_ID.firebaseapp.com',
-  projectId: 'YOUR_FIREBASE_PROJECT_ID',
-  messagingSenderId: 'YOUR_FIREBASE_SENDER_ID',
-  appId: 'YOUR_FIREBASE_WEB_APP_ID',
+  apiKey: 'AIzaSyA_fNZAB0fGLFV9Arbk4iEklgB85NFOlEk',
+  authDomain: 'demirturk-mobil-4954e.firebaseapp.com',
+  projectId: 'demirturk-mobil-4954e',
+  messagingSenderId: '833952865318',
+  appId: '1:833952865318:web:7c0e25f433f20b2f715ae7',
 });
 
 firebase.messaging();
