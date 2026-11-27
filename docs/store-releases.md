@@ -5,6 +5,11 @@ Flutter tests and release-tool checks. No store keys are used in pull requests.
 `stable` is the release branch: merging a tested change there starts **Release
 to stores**. `codex/v15-xcode` retains the original V15 Xcode handoff.
 
+`stable` is the repository's default branch. It requires a pull request with
+passing **Flutter checks** and **Release tool checks**, including for repository
+administrators; force pushes and branch deletion are disabled. Work on
+`development`, then open a pull request from `development` to `stable` when ready.
+
 ## What is automatic
 
 1. Application checks must pass before release work starts.

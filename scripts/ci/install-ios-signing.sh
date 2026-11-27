@@ -19,7 +19,7 @@ PY
 security cms -D -i "$profile" > "$RUNNER_TEMP/profile.plist"
 python3 scripts/ci/release.py ios-profile
 profile_uuid=$(python3 -c 'import json,os; print(json.load(open(os.path.join(os.environ["RUNNER_TEMP"], "ios-signing.json")))["uuid"])')
-profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+profile_dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
 mkdir -p "$profile_dir"
 cp "$profile" "$profile_dir/$profile_uuid.mobileprovision"
 
