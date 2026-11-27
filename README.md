@@ -213,6 +213,14 @@ customer and preserves it for staff in the dated closed-chat archive. Theme
 preferences are stored per account. Uploaded receipt files stay in private
 Storage until explicitly deleted.
 
+## Branches and automated store delivery
+
+Use `development` for ongoing work and `stable` for releases. Tested changes
+merged into `stable` start signed Android/iOS builds and store submission.
+Store credentials and complete app records are required before delivery can
+succeed. See [store release setup](docs/store-releases.md) for the exact status,
+secret names, TestFlight/internal testing and production behavior.
+
 ## Current integration status
 
 The app contains Supabase client initialization, customer and

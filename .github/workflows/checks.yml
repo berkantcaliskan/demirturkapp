@@ -1,0 +1,51 @@
+name: Application checks
+
+on:
+  push:
+    branches: [development]
+  pull_request:
+    branches: [development, stable]
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  flutter:
+    name: Flutter checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: '3.50.0'
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter analyze --no-fatal-infos
+      - run: flutter test
+      - name: Check release versioning and signing preparation
+        run: python3 -m unittest discover -s scripts/ci -p 'test_*.py'
+
+  release-tools:
+    name: Release tool checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: ruby/setup-ruby@145243922b4465b78e04dd66294782c7de45901f # v1
+        with:
+          ruby-version: '3.3'
+      - run: ruby -c fastlane/Fastfile
+      - run: bash -n scripts/ci/install-ios-signing.sh scripts/ci/cleanup-ios-signing.sh
+      - run: bundle install --jobs 4 --retry 3
+      - name: Validate Fastlane configuration without store credentials
+        env:
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_OPT_OUT_USAGE: '1'
+        run: bundle exec fastlane lanes

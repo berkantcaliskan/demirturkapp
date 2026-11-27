@@ -1,0 +1,200 @@
+name: Release to stores
+run-name: Release ${{ github.sha }}
+
+on:
+  push:
+    branches: [stable]
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: 'production: stores; testing: TestFlight and Play internal testing'
+        type: choice
+        options: [testing, production]
+        default: testing
+
+permissions:
+  contents: read
+
+# Never cancel a build while it is submitting a store release.
+concurrency:
+  group: demirturk-store-release
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: '3.50.0'
+  FASTLANE_SKIP_UPDATE_CHECK: '1'
+  FASTLANE_HIDE_CHANGELOG: '1'
+  FASTLANE_OPT_OUT_USAGE: '1'
+
+jobs:
+  checks:
+    if: github.ref == 'refs/heads/stable'
+    uses: ./.github/workflows/checks.yml
+
+  prepare:
+    needs: checks
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.config.outputs.version }}
+      android_build: ${{ steps.config.outputs.android_build }}
+      ios_build: ${{ steps.config.outputs.ios_build }}
+      android_ready: ${{ steps.config.outputs.android_ready }}
+      play_ready: ${{ steps.config.outputs.play_ready }}
+      ios_ready: ${{ steps.config.outputs.ios_ready }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Determine version and available store connections
+        id: config
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+          ANDROID_BUILD_BASE: ${{ vars.ANDROID_BUILD_BASE || '100000' }}
+        run: python3 scripts/ci/release.py prepare
+
+  android:
+    name: Android build and Play delivery
+    needs: prepare
+    if: needs.prepare.outputs.android_ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - name: Prepare signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/demirturk.p12"
+      - name: Build signed AAB and APK
+        env:
+          DEMIRTURK_KEYSTORE_PATH: ${{ runner.temp }}/demirturk.p12
+          DEMIRTURK_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          DEMIRTURK_KEY_ALIAS: ${{ vars.ANDROID_KEY_ALIAS || 'demirturk' }}
+          DEMIRTURK_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD || secrets.ANDROID_KEYSTORE_PASSWORD }}
+          BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_NUMBER: ${{ needs.prepare.outputs.android_build }}
+        run: |
+          flutter build appbundle --release --build-name="$BUILD_VERSION" --build-number="$BUILD_NUMBER"
+          flutter build apk --release --build-name="$BUILD_VERSION" --build-number="$BUILD_NUMBER"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.android_build }}
+          path: |
+            build/app/outputs/bundle/release/*.aab
+            build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
+      - uses: ruby/setup-ruby@145243922b4465b78e04dd66294782c7de45901f # v1
+        if: needs.prepare.outputs.play_ready == 'true'
+        with:
+          ruby-version: '3.3'
+      - name: Install Fastlane
+        if: needs.prepare.outputs.play_ready == 'true'
+        run: bundle install --jobs 4 --retry 3
+      - name: Submit to Google Play
+        if: needs.prepare.outputs.play_ready == 'true'
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          STORE_DESTINATION: ${{ inputs.destination || 'production' }}
+        run: bundle exec fastlane android publish
+      - name: Remove signing material
+        if: always()
+        run: rm -f "$RUNNER_TEMP/demirturk.p12"
+
+  ios:
+    name: iOS build and App Store delivery
+    needs: prepare
+    if: needs.prepare.outputs.ios_ready == 'true'
+    runs-on: macos-26
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          cache: true
+      - uses: ruby/setup-ruby@145243922b4465b78e04dd66294782c7de45901f # v1
+        with:
+          ruby-version: '3.3'
+      - run: bundle install --jobs 4 --retry 3
+      - run: flutter pub get --enforce-lockfile
+      - name: Install distribution certificate and provisioning profile
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: bash scripts/ci/install-ios-signing.sh
+      - name: Build signed IPA
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_NUMBER: ${{ needs.prepare.outputs.ios_build }}
+        run: bundle exec fastlane ios build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ios-${{ needs.prepare.outputs.version }}-${{ needs.prepare.outputs.ios_build }}
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+      - name: Submit to Apple
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
+          BUILD_VERSION: ${{ needs.prepare.outputs.version }}
+          BUILD_NUMBER: ${{ needs.prepare.outputs.ios_build }}
+          STORE_DESTINATION: ${{ inputs.destination || 'production' }}
+        run: bundle exec fastlane ios publish
+      - name: Remove signing material
+        if: always()
+        run: bash scripts/ci/cleanup-ios-signing.sh
+
+  delivery-status:
+    name: Store delivery status
+    needs: [prepare, android, ios]
+    if: always() && github.ref == 'refs/heads/stable'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Verify both store deliveries
+        env:
+          PLAY_READY: ${{ needs.prepare.outputs.play_ready }}
+          IOS_READY: ${{ needs.prepare.outputs.ios_ready }}
+          ANDROID_RESULT: ${{ needs.android.result }}
+          IOS_RESULT: ${{ needs.ios.result }}
+        run: |
+          if [[ "$PLAY_READY" != true || "$IOS_READY" != true ]]; then
+            echo '::error::Store setup is incomplete. See prepare summary and docs/store-releases.md.'
+            echo 'Store submission pending: missing store connections. Available signed files are in Artifacts.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          if [[ "$ANDROID_RESULT" != success || "$IOS_RESULT" != success ]]; then
+            echo '::error::One or more store deliveries failed. Inspect the platform job before retrying.'
+            exit 1
+          fi
+          echo 'Both builds were submitted. Store review/processing and device updates are separate steps.' >> "$GITHUB_STEP_SUMMARY"

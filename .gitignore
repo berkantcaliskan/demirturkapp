@@ -60,3 +60,13 @@ supabase/.branches/
 **/sender.json
 **/*service-account*.json
 backups/
+
+# Store delivery credentials and Fastlane local output
+*.p8
+*.mobileprovision
+.bundle/
+vendor/bundle/
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/readme.md
+scripts/ci/__pycache__/

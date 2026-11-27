@@ -1,0 +1,85 @@
+require 'json'
+
+def required(name)
+  value = ENV.fetch(name, '').strip
+  UI.user_error!("Missing #{name}") if value.empty?
+  value
+end
+
+def production?
+  destination = required('STORE_DESTINATION')
+  UI.user_error!('Invalid store destination') unless %w[production testing].include?(destination)
+  destination == 'production'
+end
+
+platform :android do
+  desc 'Upload the signed bundle to production or internal testing'
+  lane :publish do
+    upload_to_play_store(
+      package_name: 'com.sirket.senettakip.senet_takip',
+      json_key_data: required('PLAY_SERVICE_ACCOUNT_JSON'),
+      aab: File.expand_path('../build/app/outputs/bundle/release/app-release.aab', __dir__),
+      track: production? ? 'production' : 'internal',
+      release_status: 'completed',
+      changes_not_sent_for_review: false,
+      rescue_changes_not_sent_for_review: false,
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_changelogs: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true
+    )
+  end
+end
+
+platform :ios do
+  desc 'Sign and build the Flutter application using an App Store profile'
+  lane :build do
+    profile = JSON.parse(File.read(File.join(required('RUNNER_TEMP'), 'ios-signing.json')))
+    update_code_signing_settings(
+      use_automatic_signing: false,
+      path: File.expand_path('../ios/Runner.xcodeproj', __dir__),
+      team_id: required('APPLE_TEAM_ID'),
+      code_sign_identity: 'Apple Distribution',
+      profile_name: profile.fetch('name'),
+      targets: ['Runner'],
+      build_configurations: ['Release']
+    )
+    # Paths passed to Flutter are absolute; no credentials enter the build arguments.
+    Dir.chdir(File.expand_path('..', __dir__)) do
+      sh('flutter', 'build', 'ipa', '--release',
+         "--build-name=#{required('BUILD_VERSION')}",
+         "--build-number=#{required('BUILD_NUMBER')}",
+         "--export-options-plist=#{File.join(required('RUNNER_TEMP'), 'ExportOptions.plist')}")
+    end
+  end
+
+  desc 'Upload to TestFlight or submit for App Store review and automatic release'
+  lane :publish do
+    api_key = app_store_connect_api_key(
+      key_id: required('ASC_KEY_ID'),
+      issuer_id: required('ASC_ISSUER_ID'),
+      key_content: required('ASC_PRIVATE_KEY_BASE64'),
+      is_key_content_base64: true,
+      in_house: false
+    )
+    ipa = Dir[File.expand_path('../build/ios/ipa/*.ipa', __dir__)].fetch(0)
+    if production?
+      upload_to_app_store(
+        api_key: api_key,
+        app_identifier: 'com.sirket.senettakip.senetTakip',
+        ipa: ipa,
+        app_version: required('BUILD_VERSION'),
+        build_number: required('BUILD_NUMBER'),
+        submit_for_review: true,
+        automatic_release: true,
+        skip_metadata: true,
+        skip_screenshots: true,
+        precheck_include_in_app_purchases: false,
+        force: true
+      )
+    else
+      upload_to_testflight(api_key: api_key, ipa: ipa, distribute_external: false)
+    end
+  end
+end
