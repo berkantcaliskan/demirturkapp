@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.119.2';
+import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2.119.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +39,7 @@ function normalizePhone(value: string): string | null {
   return digits.length === 10 && digits.startsWith('5') ? `+90${digits}` : null;
 }
 
-async function getStaffPhones(admin: ReturnType<typeof createClient>): Promise<Set<string> | null> {
+async function getStaffPhones(admin: SupabaseClient): Promise<Set<string> | null> {
   const configured = Deno.env.get('STAFF_PHONE_ROSTER');
   if (!configured) {
     const { data, error } = await admin.from('staff_account_roster').select('phone');

@@ -7,6 +7,7 @@ import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
+import '../../widgets/customer_finance_card.dart';
 import 'iban_and_statement_sheets.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
@@ -165,6 +166,7 @@ class CustomerHomeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
 
+        CustomerFinanceCard(appState: appState, customerId: customer.id, repository: readOnly ? null : repository, compact: true),
         // 2. HERO KART: Müşterinin Satın Aldığı Ev & Alt Metrik Barı (3B kenarlıksız, az renkli)
         _PurchasedHouseHeroCard(
           customer: customer,

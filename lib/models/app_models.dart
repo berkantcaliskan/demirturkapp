@@ -178,6 +178,8 @@ class Customer {
 }
 
 class PromissoryNote {
+  final String? crmPlanId;
+  final double? crmPaidAmount;
   final String id;
   final String customerId;
   final String senetNo;
@@ -196,6 +198,8 @@ class PromissoryNote {
   final String? receiptObjectPath;
 
   const PromissoryNote({
+    this.crmPlanId,
+    this.crmPaidAmount,
     required this.id,
     required this.customerId,
     required this.senetNo,
@@ -225,6 +229,8 @@ class PromissoryNote {
     String? receiptObjectPath,
   }) {
     return PromissoryNote(
+      crmPlanId: crmPlanId,
+      crmPaidAmount: crmPaidAmount,
       id: id,
       customerId: customerId,
       senetNo: senetNo,
@@ -243,6 +249,10 @@ class PromissoryNote {
       receiptObjectPath: receiptObjectPath ?? this.receiptObjectPath,
     );
   }
+
+  double get paidAmount => crmPaidAmount ?? (status == NoteStatus.paid ? amount : 0);
+  double get remainingAmount => (amount - paidAmount).clamp(0.0, amount);
+  bool get isPartiallyPaid => paidAmount > 0 && remainingAmount > 0;
 }
 
 class BankAccount {

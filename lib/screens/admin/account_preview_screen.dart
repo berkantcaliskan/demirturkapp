@@ -43,6 +43,10 @@ class _CustomerPreviewScreenState extends State<CustomerPreviewScreen> {
       advisorId: widget.advisorId,
     );
     if (row == null || !mounted) return false;
+    if (widget.advisorId == null && row['contract_status'] == 'approved') {
+      try { await repository.syncCustomerFinance(row['id'].toString()); }
+      catch (_) { _preview.setFinanceError(row['id'].toString(), 'Ödemeler yenilenemedi. Son doğrulanmış bilgiler gösteriliyor.'); }
+    }
     final results = await Future.wait([
       if (widget.advisorId == null)
         repository.loadNotesForCustomer(row['id'].toString())
@@ -56,6 +60,7 @@ class _CustomerPreviewScreenState extends State<CustomerPreviewScreen> {
       noteRows: results[0],
       bankRows: results[1],
     );
+    if (widget.advisorId == null) _preview.replaceBackendFinances(await repository.loadFinanceSnapshots());
     return true;
   }
 

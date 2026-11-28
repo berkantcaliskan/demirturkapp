@@ -453,6 +453,7 @@ class _MainShellState extends State<MainShell> {
     final repository = _portalRepository;
     if (repository == null) return;
     try {
+      await _refreshFinanceData(sync: true);
       final notes = widget.appState.currentRole.canSeePromissoryNotes
           ? await repository.loadNotes()
           : await repository.loadMyNotes();
@@ -460,6 +461,28 @@ class _MainShellState extends State<MainShell> {
     } catch (error) {
       debugPrint(userFacingError(error, fallback: 'Notes refresh failed. Tekrar deneyin.'));
     }
+  }
+
+  bool _financeRefreshInProgress = false;
+  Future<void> _refreshFinanceData({bool sync = false}) async {
+    final repository = _portalRepository;
+    if (repository == null || _financeRefreshInProgress) return;
+    final userId = repository.currentUserId;
+    final customerId = widget.appState.selectedCustomerId;
+    _financeRefreshInProgress = true;
+    try {
+      if (sync && customerId.isNotEmpty && !widget.appState.currentCustomer.contractPending) {
+        try {
+          await repository.syncCustomerFinance(customerId);
+          if (mounted && repository.currentUserId == userId) widget.appState.setFinanceError(customerId, null);
+        } catch (error) {
+          if (mounted && repository.currentUserId == userId) widget.appState.setFinanceError(customerId,
+            userFacingError(error, fallback: 'Ödeme bilgileri yenilenemedi. Son doğrulanmış bilgiler gösteriliyor.'));
+        }
+      }
+      final rows = await repository.loadFinanceSnapshots();
+      if (mounted && repository.currentUserId == userId) widget.appState.replaceBackendFinances(rows);
+    } finally { _financeRefreshInProgress = false; }
   }
 
   Future<void> _refreshCustomers() async {
@@ -538,6 +561,11 @@ class _MainShellState extends State<MainShell> {
           return;
         }
         _customerContractPending = customer['contract_status'] == 'pending';
+        if (!_customerContractPending) {
+          try { await repository.syncCustomerFinance(customer['id'].toString()); }
+          catch (error) { widget.appState.setFinanceError(customer['id'].toString(),
+            userFacingError(error, fallback: 'Ödeme bilgileri yenilenemedi. Son doğrulanmış bilgiler gösteriliyor.')); }
+        }
         final notes = await repository.loadMyNotes();
         widget.appState.replaceBackendCustomerData(
           customerRow: customer,
@@ -545,6 +573,7 @@ class _MainShellState extends State<MainShell> {
           bankRows: banks,
         );
       }
+      await _refreshFinanceData();
       if (mounted) {
         setState(() {
           _backendDataReady = true;
@@ -723,6 +752,7 @@ class _MainShellState extends State<MainShell> {
     final confirmController = TextEditingController();
     final currentController = TextEditingController();
     final verifyCurrent = !widget.appState.currentRole.isStaff;
+    final flexiblePassword = widget.appState.currentRole.isStaff;
     final values = await showCupertinoDialog<(String, String, String)?>(
       context: context,
       builder: (dialogContext) => CupertinoAlertDialog(
@@ -744,17 +774,17 @@ class _MainShellState extends State<MainShell> {
               ],
               CupertinoTextField(
                 controller: passwordController,
-                keyboardType: TextInputType.number,
+                keyboardType: flexiblePassword ? TextInputType.visiblePassword : TextInputType.number,
                 obscureText: true,
-                maxLength: 6,
-                placeholder: '6 haneli parola',
+                maxLength: flexiblePassword ? 128 : 6,
+                placeholder: 'Yeni parola',
               ),
               const SizedBox(height: 8),
               CupertinoTextField(
                 controller: confirmController,
-                keyboardType: TextInputType.number,
+                keyboardType: flexiblePassword ? TextInputType.visiblePassword : TextInputType.number,
                 obscureText: true,
-                maxLength: 6,
+                maxLength: flexiblePassword ? 128 : 6,
                 placeholder: 'Parola tekrarı',
               ),
             ],
@@ -785,9 +815,12 @@ class _MainShellState extends State<MainShell> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mevcut parolanızı girin.')));
       return;
     }
-    if (!RegExp(r'^\d{6}$').hasMatch(values.$1) || values.$1 != values.$2) {
+    final validPassword = flexiblePassword
+        ? values.$1.length >= 6 && values.$1.length <= 128 && RegExp(r'[a-zA-ZçÇğĞıİöÖşŞüÜ]').hasMatch(values.$1) && RegExp(r'\d').hasMatch(values.$1)
+        : RegExp(r'^\d{6}$').hasMatch(values.$1);
+    if (!validPassword || values.$1 != values.$2) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Parolalar aynı ve 6 rakamdan oluşmalı.')),
+        SnackBar(content: Text(flexiblePassword ? 'Parolaları kontrol edin.' : 'Parolalar aynı ve 6 rakamdan oluşmalı.')),
       );
       return;
     }

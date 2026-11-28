@@ -5,6 +5,7 @@ import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
+import '../../widgets/customer_finance_card.dart';
 import 'iban_and_statement_sheets.dart';
 
 class CustomerNotesScreen extends StatelessWidget {
@@ -147,6 +148,8 @@ class CustomerNotesScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
+
+        CustomerFinanceCard(appState: appState, customerId: customer.id, repository: readOnly ? null : repository),
 
         // 2. Ödeme Bilgileri (Kuruma) Kartı — Şimdilik tıklandığında açılmaz
         GlassCard(
@@ -381,7 +384,7 @@ class CustomerNotesScreen extends StatelessWidget {
                                 Padding(
                                   padding: const EdgeInsets.only(left: 11),
                                   child: Text(
-                                    note.status.label,
+                                    note.isPartiallyPaid ? 'Kısmen ödendi' : note.status.label,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -410,6 +413,8 @@ class CustomerNotesScreen extends StatelessWidget {
                                     color: AppGlass.textPrimary(context),
                                   ),
                                 ),
+                                if (note.isPartiallyPaid) Text('Kalan ${formatCompactCurrency(note.remainingAmount)}',
+                                  style: TextStyle(fontSize: 10, color: AppGlass.textSecondary(context))),
                               ],
                             ),
                           ),

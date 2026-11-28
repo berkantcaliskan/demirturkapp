@@ -70,3 +70,4 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/readme.md
 scripts/ci/__pycache__/
+**/node_modules/

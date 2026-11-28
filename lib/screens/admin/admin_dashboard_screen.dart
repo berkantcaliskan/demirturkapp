@@ -11,6 +11,7 @@ import '../../services/portal_repository.dart';
 import '../../services/upload_policy.dart';
 import '../../utils/turkish_phone_input_formatter.dart';
 import '../../widgets/contract_document_button.dart';
+import '../../widgets/crm_finance_link_button.dart';
 import '../../widgets/contract_document_upload_button.dart';
 import 'admin_support_inbox_screen.dart';
 import '../../widgets/website_blurred_background.dart';
@@ -29,6 +30,21 @@ class AdminDashboardScreen extends StatelessWidget {
     required this.onPreviewCustomer,
     this.repository,
   });
+
+  Future<void> _refreshCrmFinance(BuildContext context, PromissoryNote note) async {
+    final source = repository;
+    if (source == null) return;
+    try {
+      await source.syncCustomerFinance(note.customerId);
+      appState.replaceBackendFinances(await source.loadFinanceSnapshots());
+      appState.replaceBackendNotes(await source.loadNotes());
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('CRM ödeme bilgileri yenilendi. Tahsilatları e-Demirtürk’te kaydedebilirsiniz.')));
+    } catch (error) {
+      if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(userFacingError(error, fallback: 'Ödeme bilgileri yenilenemedi.'))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -376,8 +392,9 @@ class AdminDashboardScreen extends StatelessWidget {
                         child: IosGlassButton(
                           color: const Color(0xFF30D158),
                           icon: CupertinoIcons.checkmark_alt_circle_fill,
-                          label: 'Ödemeyi Onayla',
+                          label: note.crmPlanId == null ? 'Ödemeyi Onayla' : 'CRM’den yenile',
                           onTap: () async {
+                            if (note.crmPlanId != null) { await _refreshCrmFinance(context, note); return; }
                             if (repository == null) {
                               appState.approveNotePayment(note.id);
                             } else {
@@ -545,8 +562,9 @@ class AdminDashboardScreen extends StatelessWidget {
                       Expanded(
                         child: IosGlassButton(
                           icon: CupertinoIcons.checkmark_alt_circle_fill,
-                          label: 'Tahsil Edildi',
+                          label: note.crmPlanId == null ? 'Tahsil Edildi' : 'CRM’den yenile',
                           onTap: () async {
+                            if (note.crmPlanId != null) { await _refreshCrmFinance(context, note); return; }
                             if (repository == null) {
                               appState.approveNotePayment(
                                 note.id,
@@ -678,6 +696,7 @@ class AdminDashboardScreen extends StatelessWidget {
                         padding: EdgeInsets.zero,
                         minimumSize: Size.zero,
                         onPressed: () async {
+                          if (note.crmPlanId != null) { await _refreshCrmFinance(context, note); return; }
                           if (repository == null) {
                             appState.approveNotePayment(note.id);
                           } else {
@@ -724,9 +743,9 @@ class AdminDashboardScreen extends StatelessWidget {
                               width: 0.6,
                             ),
                           ),
-                          child: const Text(
-                            'Tahsil Et ✓',
-                            style: TextStyle(
+                          child: Text(
+                            note.crmPlanId == null ? 'Tahsil Et ✓' : 'CRM’den yenile',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: Color(0xFF64D2FF),
@@ -950,6 +969,13 @@ class AdminDashboardScreen extends StatelessWidget {
                       customerId: c.id,
                     ),
                 ],
+                if (appState.currentRole.canSeePromissoryNotes)
+                  if (repository != null && !c.contractPending && !c.isPendingContractRecord)
+                    CrmFinanceLinkButton(repository: repository!, customer: c, onChanged: () async {
+                      appState.replaceBackendFinances(await repository!.loadFinanceSnapshots());
+                      appState.replaceBackendNotes(await repository!.loadNotes());
+                      await _refreshCustomers();
+                    }),
                 if (appState.currentRole.canSeePromissoryNotes)
                   Row(
                     children: [

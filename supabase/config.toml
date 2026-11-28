@@ -7,3 +7,8 @@ verify_jwt = false
 [functions.provision-staff-account]
 verify_jwt = false
 
+[functions.crm-finance]
+verify_jwt = true
+
+[functions.crm-finance-worker]
+verify_jwt = false
