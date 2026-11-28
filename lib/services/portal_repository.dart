@@ -19,6 +19,59 @@ class PortalRepository {
       staffNotifications ? 'staff_notifications' : 'notifications';
   String? get currentUserId => _client.auth.currentUser?.id;
 
+  Future<List<Map<String, dynamic>>> loadFinanceSnapshots() async {
+    try {
+      return await _allRows((start, end) => _client.from('customer_finance_snapshots')
+          .select('customer_id,snapshot,imported_at').order('customer_id').range(start, end));
+    } on PostgrestException catch (error) {
+      if (['42P01', 'PGRST205'].contains(error.code)) return [];
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> _financeAction(Map<String, dynamic> body) async {
+    try {
+      final result = await _client.functions.invoke('crm-finance', body: body);
+      return Map<String, dynamic>.from(result.data as Map);
+    } on FunctionException catch (error) {
+      final code = error.details is Map ? (error.details as Map)['error'] : null;
+      throw FormatException(switch (code) {
+        'finance_forbidden' => 'Bu müşterinin ödeme bilgilerine erişiminiz yok.',
+        'finance_plan_already_linked' => 'Bu sözleşme başka bir müşteriyle eşleştirilmiş.',
+        'finance_reconciliation_required' => 'CRM’de tahsilatların ilgili senetlerle eşleştirilmesi gerekiyor.',
+        'finance_unbalanced_plan' => 'CRM ödeme planı toplamıyla sözleşme tutarı uyuşmuyor. Muhasebe kontrolü gerekiyor.',
+        'finance_overpayment' => 'CRM tahsilat toplamı kontrol edilmeli. Son doğrulanmış bilgiler korunuyor.',
+        'finance_setup_pending' => 'CRM bağlantısı henüz etkinleştirilmedi.',
+        'finance_link_changed' => 'Hesap eşleştirmesi değişti. Ödemeleri yeniden yenileyin.',
+        _ => 'Ödeme bilgileri şu an yenilenemiyor. Son doğrulanmış bilgiler gösteriliyor.',
+      });
+    }
+  }
+
+  Future<void> syncCustomerFinance(String customerId) async {
+    // Existing accounts without a CRM link continue using their current payment flow.
+    try {
+      final links = await _client.from('crm_finance_links').select('customer_id').eq('customer_id', customerId).limit(1);
+      if (links.isEmpty) return;
+    } on PostgrestException catch (error) {
+      if (['42P01', 'PGRST205'].contains(error.code)) return;
+      rethrow;
+    }
+    await _financeAction({'action': 'sync', 'customerId': customerId});
+  }
+
+  Future<Map<String, dynamic>> searchCrmFinancePlans(String query, {String after = ''}) =>
+      _financeAction({'action': 'search', 'query': query, 'after': after});
+
+  Future<List<String>> loadCrmLinkedPlanIds(String customerId) async {
+    final result = await _client.rpc('portal_crm_finance_context', params: {'p_customer_id': customerId});
+    return result == null ? [] : List<String>.from((result as Map)['planIds'] as List);
+  }
+
+  Future<void> linkCrmFinancePlans(String customerId, List<String> planIds) async {
+    await _financeAction({'action': planIds.isEmpty ? 'unlink' : 'link', 'customerId': customerId, 'planIds': planIds});
+  }
+
   Future<List<Map<String, dynamic>>> _allRows(
     Future<List<Map<String, dynamic>>> Function(int start, int end) page,
   ) async {
@@ -61,7 +114,7 @@ class PortalRepository {
   }
 
   Future<List<Map<String, dynamic>>> loadCustomers({String? advisorId}) async {
-    final query = _client.from('customers').select();
+    final query = _client.from('customers').select().eq('is_demo', false);
     final rows = await _allRows((start, end) => (advisorId == null
                 ? query
                 : query.eq('assigned_advisor_id', advisorId))
@@ -545,11 +598,15 @@ class PortalRepository {
     return Uri.parse(url);
   }
 
-  Future<List<Map<String, dynamic>>> loadMyNotes() => loadNotes();
+  Future<List<Map<String, dynamic>>> loadMyNotes() => _allRows((start, end) => _client
+      .from('promissory_notes')
+      .select('*, payment_submissions(*)')
+      .order('due_date').order('id').range(start, end));
 
   Future<List<Map<String, dynamic>>> loadNotes() async => _allRows((start, end) => _client
       .from('promissory_notes')
-      .select('*, payment_submissions(*)')
+      .select('*, payment_submissions(*), customers!inner(is_demo)')
+      .eq('customers.is_demo', false)
       .order('due_date').order('id').range(start, end));
 
   Stream<List<Map<String, dynamic>>> watchNotes() => _client
@@ -569,6 +626,12 @@ class PortalRepository {
     String? rejectionReason,
     String? paymentMethod,
   }) async {
+    if (approved) {
+      final note = await _client.from('promissory_notes').select().eq('id', noteId).single();
+      if (note['crm_plan_id'] != null) {
+        throw const FormatException('Tahsilatı e-Demirtürk’te kaydedip ödeme bilgilerini yenileyin.');
+      }
+    }
     final submissions = await _client
         .from('payment_submissions')
         .select('id')

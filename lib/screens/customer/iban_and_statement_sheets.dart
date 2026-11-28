@@ -462,7 +462,7 @@ void showUploadReceiptSheet(
                               ),
                               child: Center(
                                 child: Text(
-                                  '${note.senetNo} • ${formatCurrency(note.amount)}',
+                                  '${note.senetNo} • ${formatCurrency(note.remainingAmount)}',
                                   style: TextStyle(
                                     color: active ? activeFg : textPrimary,
                                     fontSize: 12.5,
@@ -669,7 +669,7 @@ void showUploadReceiptSheet(
                       child: IosGlassButton(
                         icon: CupertinoIcons.paperplane_fill,
                         label:
-                            '${formatCurrency(selectedNote.amount)} Ödeme Bildirimini Gönder',
+                            '${formatCurrency(selectedNote.remainingAmount)} Ödeme Bildirimini Gönder',
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         onTap: () async {
                           final customerNote =

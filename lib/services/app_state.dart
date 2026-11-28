@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/app_models.dart';
+import '../models/customer_finance.dart';
 
 class AppState extends ChangeNotifier {
   UserRole _currentRole = UserRole.customer;
@@ -8,6 +9,28 @@ class AppState extends ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _hasRemoteNotifications = false;
   String? _localStaffName;
+  final Map<String, CustomerFinance> _finances = {};
+  final Map<String, String> _financeErrors = {};
+  CustomerFinance? financeFor(String customerId) => _finances[customerId];
+  String? financeErrorFor(String customerId) => _financeErrors[customerId];
+  void setFinanceError(String customerId, String? error) {
+    if (error == null) {
+      _financeErrors.remove(customerId);
+    } else {
+      _financeErrors[customerId] = error;
+    }
+    notifyListeners();
+  }
+
+  void replaceBackendFinances(List<Map<String, dynamic>> rows) {
+    final parsed = rows.map(CustomerFinance.fromRow).toList();
+    _finances
+      ..clear()
+      ..addEntries(
+        parsed.map((finance) => MapEntry(finance.customerId, finance)),
+      );
+    notifyListeners();
+  }
 
   UserRole get currentRole => _currentRole;
   String get selectedCustomerId => _selectedCustomerId;
@@ -26,6 +49,8 @@ class AppState extends ChangeNotifier {
   }
 
   void clearSessionData() {
+    _finances.clear();
+    _financeErrors.clear();
     _selectedCustomerId = '';
     _hasRemoteNotifications = false;
     _localStaffName = null;
@@ -316,6 +341,8 @@ class AppState extends ChangeNotifier {
   }
 
   Customer _customerFromRow(Map<String, dynamic> row) => Customer(
+    downPaymentAmount: (row['down_payment_amount'] as num?)?.toDouble() ?? 0,
+    isDemo: row['is_demo'] == true,
     id: row['id'].toString(),
     name: row['full_name']?.toString() ?? '',
     tcOrTaxNo: row['national_or_tax_id']?.toString() ?? '',
@@ -360,6 +387,8 @@ class AppState extends ChangeNotifier {
         : submissions.first;
     final receiptPath = submission?['receipt_object_path']?.toString();
     return PromissoryNote(
+      crmPlanId: row['crm_plan_id']?.toString(),
+      crmPaidAmount: (row['crm_paid_amount'] as num?)?.toDouble(),
       id: row['id'].toString(),
       customerId: row['customer_id'].toString(),
       senetNo: row['note_number']?.toString() ?? '',
@@ -393,21 +422,34 @@ class AppState extends ChangeNotifier {
 
   // Customer totals
   double getCustomerTotalAmount(String customerId) {
-    return _notes
-        .where((n) => n.customerId == customerId)
-        .fold(0.0, (sum, n) => sum + n.amount);
+    if (_finances[customerId] case final finance?) return finance.total;
+    return (_customers
+                .where((c) => c.id == customerId)
+                .firstOrNull
+                ?.downPaymentAmount ??
+            0) +
+        _notes
+            .where((n) => n.customerId == customerId)
+            .fold(0.0, (sum, n) => sum + n.amount);
   }
 
   double getCustomerPaidAmount(String customerId) {
-    return _notes
-        .where((n) => n.customerId == customerId && n.status == NoteStatus.paid)
-        .fold(0.0, (sum, n) => sum + n.amount);
+    if (_finances[customerId] case final finance?) return finance.paid;
+    return (_customers
+                .where((c) => c.id == customerId)
+                .firstOrNull
+                ?.downPaymentAmount ??
+            0) +
+        _notes
+            .where((n) => n.customerId == customerId)
+            .fold(0.0, (sum, n) => sum + n.paidAmount);
   }
 
   double getCustomerRemainingAmount(String customerId) {
+    if (_finances[customerId] case final finance?) return finance.remaining;
     return _notes
         .where((n) => n.customerId == customerId && n.status != NoteStatus.paid)
-        .fold(0.0, (sum, n) => sum + n.amount);
+        .fold(0.0, (sum, n) => sum + n.remainingAmount);
   }
 
   double getCustomerOverdueAmount(String customerId) {
@@ -415,24 +457,29 @@ class AppState extends ChangeNotifier {
         .where(
           (n) => n.customerId == customerId && n.status == NoteStatus.overdue,
         )
-        .fold(0.0, (sum, n) => sum + n.amount);
+        .fold(0.0, (sum, n) => sum + n.remainingAmount);
   }
 
   // Company-wide totals (for Admin)
   double get companyTotalReceivables =>
-      _notes.fold(0.0, (sum, n) => sum + n.amount);
+      _finances.values.fold(0.0, (sum, f) => sum + f.total) +
+      _notes
+          .where((n) => !_finances.containsKey(n.customerId))
+          .fold(0.0, (sum, n) => sum + n.amount);
 
-  double get companyTotalCollected => _notes
-      .where((n) => n.status == NoteStatus.paid)
-      .fold(0.0, (sum, n) => sum + n.amount);
+  double get companyTotalCollected =>
+      _finances.values.fold(0.0, (sum, f) => sum + f.paid) +
+      _notes
+          .where((n) => !_finances.containsKey(n.customerId))
+          .fold(0.0, (sum, n) => sum + n.paidAmount);
 
   double get companyTotalOverdue => _notes
       .where((n) => n.status == NoteStatus.overdue)
-      .fold(0.0, (sum, n) => sum + n.amount);
+      .fold(0.0, (sum, n) => sum + n.remainingAmount);
 
   double get companyTotalVerifying => _notes
       .where((n) => n.status == NoteStatus.verifying)
-      .fold(0.0, (sum, n) => sum + n.amount);
+      .fold(0.0, (sum, n) => sum + n.remainingAmount);
 
   Customer getCustomerById(String id) {
     return _customers.where((customer) => customer.id == id).firstOrNull ??

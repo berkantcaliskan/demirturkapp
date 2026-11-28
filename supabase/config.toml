@@ -7,3 +7,12 @@ verify_jwt = false
 [functions.provision-staff-account]
 verify_jwt = false
 
+[functions.crm-finance]
+verify_jwt = true
+
+[functions.crm-finance-worker]
+verify_jwt = false
+
+# Authenticated in the function with auth.getUser, including modern JWT keys.
+[functions.account-settings]
+verify_jwt = false

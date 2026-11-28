@@ -113,6 +113,15 @@ see promissory notes. All staff can organize customers into persistent folders.
 
 ## Phone-number usernames
 
+Customer and staff accounts now share the normal sign-in screen. The password
+field uses the same boxed style as the other inputs. Known staff username
+numbers enable an unrestricted password input silently; customer registration
+keeps the six-digit numeric password. The phone hint never grants a role:
+permissions still come from the authenticated database profile. Staff passwords
+are not stored in app code. New server-provisioned staff passwords must contain
+letters and numbers, with 6–128 characters. Rotating the existing staff accounts
+is a separate authorized operation once the new passwords are supplied.
+
 Customers create an account with only a Turkish mobile number and a six-digit
 password. The number is normalized to `+90XXXXXXXXXX`, so a leading `0`, a
 `+90` prefix, spaces and punctuation do not change the username. Registration
@@ -214,6 +223,9 @@ preferences are stored per account. Uploaded receipt files stay in private
 Storage until explicitly deleted.
 
 ## Branches and automated store delivery
+
+The CRM financial integration is prepared in source and isolated tests;
+live deployment is pending. See [CRM finance setup](docs/crm-finance.md).
 
 Use `development` for ongoing work and `stable` for releases. Tested changes
 merged into `stable` start signed Android/iOS builds and store submission.

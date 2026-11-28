@@ -7,6 +7,7 @@ import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/portal_repository.dart';
 import '../../widgets/website_blurred_background.dart';
+import '../../widgets/customer_finance_card.dart';
 import 'iban_and_statement_sheets.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
@@ -39,7 +40,7 @@ class CustomerHomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customer = appState.currentCustomer;
-    final notes = appState.customerNotes;
+    final notes = appState.customerNotes.where((n) => n.installmentIndex > 0).toList();
     final total = appState.getCustomerTotalAmount(customer.id);
     final paid = appState.getCustomerPaidAmount(customer.id);
     final remaining = appState.getCustomerRemainingAmount(customer.id);
@@ -165,6 +166,7 @@ class CustomerHomeScreen extends StatelessWidget {
         ),
         const SizedBox(height: 4),
 
+        CustomerFinanceCard(appState: appState, customerId: customer.id, repository: readOnly ? null : repository, compact: true),
         // 2. HERO KART: Müşterinin Satın Aldığı Ev & Alt Metrik Barı (3B kenarlıksız, az renkli)
         _PurchasedHouseHeroCard(
           customer: customer,
@@ -1248,6 +1250,7 @@ class _DualWaveChartPainter extends CustomPainter {
         text: TextSpan(
           text: labels[i],
           style: TextStyle(
+            fontFamily: 'Plus Jakarta Sans',
             color: isDark
                 ? Colors.white.withValues(alpha: 0.45)
                 : const Color(0xFF94A3B8),
@@ -1379,6 +1382,7 @@ class _DualWaveChartPainter extends CustomPainter {
       text: TextSpan(
         text: highlightText,
         style: TextStyle(
+          fontFamily: 'Plus Jakarta Sans',
           color: isDark ? const Color(0xFF0F172A) : Colors.white,
           fontSize: 9.5,
           fontWeight: FontWeight.w700,
@@ -1550,7 +1554,7 @@ class _NextInstallmentSpotlightCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Ödenmemiş senediniz yok',
+                        'Vadesi geçmiş senediniz yok',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w500,

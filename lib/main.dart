@@ -1,4 +1,5 @@
 import './services/user_facing_error.dart';
+
 import 'dart:ui';
 import 'dart:async';
 
@@ -9,12 +10,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/backend_config.dart';
 import 'services/portal_repository.dart';
 import 'services/push_notification_service.dart';
-import 'services/auth_repository.dart';
 import 'services/secure_session_storage.dart';
 import 'models/app_models.dart';
 import 'services/app_state.dart';
 import 'screens/auth/auth_screen.dart';
-import 'screens/customer/customer_contract_card.dart';
+import 'screens/customer/customer_account_settings.dart';
 import 'screens/customer/customer_home_screen.dart';
 import 'screens/customer/customer_notes_screen.dart';
 import 'screens/customer/customer_project_screen.dart';
@@ -63,13 +63,14 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
     super.initState();
     unawaited(_restorePersistedSession());
     if (BackendConfig.fromEnvironment().isConfigured) {
-      _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((event) {
-        if (event.event == AuthChangeEvent.signedOut && mounted) {
-          _appState.clearSessionData();
-          _navigatorKey.currentState?.popUntil((route) => route.isFirst);
-          setState(() => _isAuthenticated = false);
-        }
-      });
+      _authSubscription = Supabase.instance.client.auth.onAuthStateChange
+          .listen((event) {
+            if (event.event == AuthChangeEvent.signedOut && mounted) {
+              _appState.clearSessionData();
+              _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+              setState(() => _isAuthenticated = false);
+            }
+          });
     }
   }
 
@@ -108,7 +109,13 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
           _isAuthenticated = true;
         }
       } catch (error) {
-        debugPrint(userFacingError(error, fallback: 'Could not restore the saved session profile. Tekrar deneyin.'));
+        debugPrint(
+          userFacingError(
+            error,
+            fallback:
+                'Could not restore the saved session profile. Tekrar deneyin.',
+          ),
+        );
       }
     }
     await minSplash;
@@ -129,12 +136,22 @@ class _SenetTakipAppState extends State<SenetTakipApp> {
           await PushNotificationService(Supabase.instance.client)
               .unregisterCurrentToken();
         } catch (error) {
-          debugPrint(userFacingError(error, fallback: 'Could not unregister push device. Tekrar deneyin.'));
+          debugPrint(
+            userFacingError(
+              error,
+              fallback: 'Could not unregister push device. Tekrar deneyin.',
+            ),
+          );
         }
         await Supabase.instance.client.auth.signOut();
       }
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Sign out failed remotely; clearing local session. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Sign out failed remotely; clearing local session. Tekrar deneyin.',
+        ),
+      );
     } finally {
       _appState.clearSessionData();
       _appState.setRole(UserRole.customer);
@@ -363,8 +380,9 @@ class _StartupBrandScreenState extends State<_StartupBrandScreen>
 class MainShell extends StatefulWidget {
   final AppState appState;
   final Future<void> Function() onLogout;
+  final bool connectBackend;
 
-  const MainShell({super.key, required this.appState, required this.onLogout});
+  const MainShell({super.key, required this.appState, required this.onLogout, this.connectBackend = true});
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -373,7 +391,7 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _customerTabIndex = 0;
   int _adminTabIndex = 0;
-  bool _isThemeMenuOpen = false;
+
   PortalRepository? _portalRepository;
   PushNotificationService? _pushService;
   StreamSubscription<List<Map<String, dynamic>>>? _notificationSubscription;
@@ -387,7 +405,7 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    if (BackendConfig.fromEnvironment().isConfigured &&
+    if (widget.connectBackend && BackendConfig.fromEnvironment().isConfigured &&
         Supabase.instance.client.auth.currentUser != null) {
       _portalRepository = PortalRepository(
         Supabase.instance.client,
@@ -398,8 +416,12 @@ class _MainShellState extends State<MainShell> {
           .watchMyNotifications()
           .listen(
             widget.appState.replaceCustomerNotifications,
-            onError: (Object error) =>
-                debugPrint(userFacingError(error, fallback: 'Inbox realtime error. Tekrar deneyin.')),
+            onError: (Object error) => debugPrint(
+              userFacingError(
+                error,
+                fallback: 'Inbox realtime error. Tekrar deneyin.',
+              ),
+            ),
           );
       unawaited(
         _pushService!.start(
@@ -414,19 +436,32 @@ class _MainShellState extends State<MainShell> {
       unawaited(_loadPortalData());
       _notesSubscription = _portalRepository!.watchNotes().listen(
         (_) => unawaited(_refreshPortalNotes()),
-        onError: (Object error) => debugPrint(userFacingError(error, fallback: 'Notes realtime error. Tekrar deneyin.')),
+        onError: (Object error) => debugPrint(
+          userFacingError(
+            error,
+            fallback: 'Notes realtime error. Tekrar deneyin.',
+          ),
+        ),
       );
       if (widget.appState.currentRole.isStaff) {
         _customersSubscription = _portalRepository!.watchCustomers().listen(
           (_) => unawaited(_refreshCustomers()),
-          onError: (Object error) =>
-              debugPrint(userFacingError(error, fallback: 'Customers realtime error. Tekrar deneyin.')),
+          onError: (Object error) => debugPrint(
+            userFacingError(
+              error,
+              fallback: 'Customers realtime error. Tekrar deneyin.',
+            ),
+          ),
         );
       } else {
         _customersSubscription = _portalRepository!.watchMyCustomer().listen(
           (_) => unawaited(_refreshMyCustomer()),
-          onError: (Object error) =>
-              debugPrint(userFacingError(error, fallback: 'Customer realtime error. Tekrar deneyin.')),
+          onError: (Object error) => debugPrint(
+            userFacingError(
+              error,
+              fallback: 'Customer realtime error. Tekrar deneyin.',
+            ),
+          ),
         );
       }
     } else {
@@ -445,7 +480,12 @@ class _MainShellState extends State<MainShell> {
         await repository.loadMyNotifications(),
       );
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Inbox refresh failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Inbox refresh failed. Tekrar deneyin.',
+        ),
+      );
     }
   }
 
@@ -453,12 +493,52 @@ class _MainShellState extends State<MainShell> {
     final repository = _portalRepository;
     if (repository == null) return;
     try {
+      await _refreshFinanceData(sync: true);
       final notes = widget.appState.currentRole.canSeePromissoryNotes
           ? await repository.loadNotes()
           : await repository.loadMyNotes();
       widget.appState.replaceBackendNotes(notes);
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Notes refresh failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Notes refresh failed. Tekrar deneyin.',
+        ),
+      );
+    }
+  }
+
+  bool _financeRefreshInProgress = false;
+  Future<void> _refreshFinanceData({bool sync = false}) async {
+    final repository = _portalRepository;
+    if (repository == null || _financeRefreshInProgress) return;
+    final userId = repository.currentUserId;
+    final customerId = widget.appState.selectedCustomerId;
+    _financeRefreshInProgress = true;
+    try {
+      if (sync &&
+          customerId.isNotEmpty &&
+          !widget.appState.currentCustomer.contractPending) {
+        try {
+          await repository.syncCustomerFinance(customerId);
+          if (mounted && repository.currentUserId == userId)
+            widget.appState.setFinanceError(customerId, null);
+        } catch (error) {
+          if (mounted && repository.currentUserId == userId)
+            widget.appState.setFinanceError(
+              customerId,
+              userFacingError(
+                error,
+                fallback: 'Ödeme bilgileri yenilenemedi. Son doğrulanmış bilgiler gösteriliyor.',
+              ),
+            );
+        }
+      }
+      final rows = await repository.loadFinanceSnapshots();
+      if (mounted && repository.currentUserId == userId)
+        widget.appState.replaceBackendFinances(rows);
+    } finally {
+      _financeRefreshInProgress = false;
     }
   }
 
@@ -469,7 +549,12 @@ class _MainShellState extends State<MainShell> {
       final rows = await repository.loadCustomers();
       if (mounted) widget.appState.replaceBackendCustomers(rows);
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Customers refresh failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Customers refresh failed. Tekrar deneyin.',
+        ),
+      );
     }
   }
 
@@ -487,7 +572,12 @@ class _MainShellState extends State<MainShell> {
       );
       widget.appState.replaceBackendCustomers([row]);
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Customer refresh failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Customer refresh failed. Tekrar deneyin.',
+        ),
+      );
     }
   }
 
@@ -538,6 +628,19 @@ class _MainShellState extends State<MainShell> {
           return;
         }
         _customerContractPending = customer['contract_status'] == 'pending';
+        if (!_customerContractPending) {
+          try {
+            await repository.syncCustomerFinance(customer['id'].toString());
+          } catch (error) {
+            widget.appState.setFinanceError(
+              customer['id'].toString(),
+              userFacingError(
+                error,
+                fallback: 'Ödeme bilgileri yenilenemedi. Son doğrulanmış bilgiler gösteriliyor.',
+              ),
+            );
+          }
+        }
         final notes = await repository.loadMyNotes();
         widget.appState.replaceBackendCustomerData(
           customerRow: customer,
@@ -545,6 +648,7 @@ class _MainShellState extends State<MainShell> {
           bankRows: banks,
         );
       }
+      await _refreshFinanceData();
       if (mounted) {
         setState(() {
           _backendDataReady = true;
@@ -555,7 +659,12 @@ class _MainShellState extends State<MainShell> {
         if (pending != null) _openPushNotification(pending);
       }
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Portal data load failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Portal data load failed. Tekrar deneyin.',
+        ),
+      );
       if (mounted) {
         setState(() {
           _backendDataReady = true;
@@ -586,7 +695,12 @@ class _MainShellState extends State<MainShell> {
           repository.markNotificationRead(notificationId).catchError((
             Object error,
           ) {
-            debugPrint(userFacingError(error, fallback: 'Notification read state failed. Tekrar deneyin.'));
+            debugPrint(
+              userFacingError(
+                error,
+                fallback: 'Notification read state failed. Tekrar deneyin.',
+              ),
+            );
           }),
         );
       }
@@ -688,7 +802,12 @@ class _MainShellState extends State<MainShell> {
     try {
       await _portalRepository?.saveUserPreferences({'theme_mode': mode.name});
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Appearance preference save failed. Tekrar deneyin.'));
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Appearance preference save failed. Tekrar deneyin.',
+        ),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -711,105 +830,12 @@ class _MainShellState extends State<MainShell> {
       };
       if (mounted) widget.appState.setThemeMode(mode);
     } catch (error) {
-      debugPrint(userFacingError(error, fallback: 'Settings load failed. Tekrar deneyin.'));
-    }
-  }
-
-  Future<void> _changePassword() async {
-    final repository = _portalRepository;
-    if (repository == null) return;
-    final auth = AuthRepository(Supabase.instance.client);
-    final passwordController = TextEditingController();
-    final confirmController = TextEditingController();
-    final currentController = TextEditingController();
-    final verifyCurrent = !widget.appState.currentRole.isStaff;
-    final values = await showCupertinoDialog<(String, String, String)?>(
-      context: context,
-      builder: (dialogContext) => CupertinoAlertDialog(
-        title: const Text('Yeni parola'),
-        content: Padding(
-          padding: const EdgeInsets.only(top: 12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (verifyCurrent) ...[
-                CupertinoTextField(
-                  controller: currentController,
-                  keyboardType: TextInputType.number,
-                  obscureText: true,
-                  maxLength: 6,
-                  placeholder: 'Mevcut parola',
-                ),
-                const SizedBox(height: 8),
-              ],
-              CupertinoTextField(
-                controller: passwordController,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 6,
-                placeholder: '6 haneli parola',
-              ),
-              const SizedBox(height: 8),
-              CupertinoTextField(
-                controller: confirmController,
-                keyboardType: TextInputType.number,
-                obscureText: true,
-                maxLength: 6,
-                placeholder: 'Parola tekrarı',
-              ),
-            ],
-          ),
+      debugPrint(
+        userFacingError(
+          error,
+          fallback: 'Settings load failed. Tekrar deneyin.',
         ),
-        actions: [
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Vazgeç'),
-          ),
-          CupertinoDialogAction(
-            onPressed: () => Navigator.pop(dialogContext, (
-              passwordController.text,
-              confirmController.text,
-              currentController.text,
-            )),
-            child: const Text('Güncelle'),
-          ),
-        ],
-      ),
-    );
-    passwordController.dispose();
-    confirmController.dispose();
-    currentController.dispose();
-    if (values == null) return;
-    if (!mounted) return;
-    if (verifyCurrent && values.$3.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Mevcut parolanızı girin.')));
-      return;
-    }
-    if (!RegExp(r'^\d{6}$').hasMatch(values.$1) || values.$1 != values.$2) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Parolalar aynı ve 6 rakamdan oluşmalı.')),
       );
-      return;
-    }
-    try {
-      if (verifyCurrent) await auth.verifyCurrentPassword(values.$3);
-      await auth.updatePassword(values.$1);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Parolanız güncellendi.')));
-      }
-    } on AuthException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(error.message)));
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(userFacingError(error, fallback: 'Parola değiştirilemedi. Tekrar deneyin.'))),
-        );
-      }
     }
   }
 
@@ -849,9 +875,10 @@ class _MainShellState extends State<MainShell> {
         final systemTopInset = mediaQuery.viewPadding.top > 0
             ? mediaQuery.viewPadding.top
             : mediaQuery.padding.top;
-        final topStatusBarSpacing = systemTopInset > 0
-            ? systemTopInset + (screenHeight * 0.012).clamp(6.0, 14.0)
-            : (screenHeight * 0.032).clamp(18.0, 30.0);
+        final headerScale = (mediaQuery.size.width / 390).clamp(.9, 1.12);
+        final headerHeight = 60.0 * headerScale;
+        final headerGap = (screenHeight * .005).clamp(3.0, 6.0);
+        final topStatusBarSpacing = systemTopInset + headerGap;
 
         final systemBottomInset = mediaQuery.viewPadding.bottom > 0
             ? mediaQuery.viewPadding.bottom
@@ -864,7 +891,7 @@ class _MainShellState extends State<MainShell> {
           backgroundColor: Colors.transparent,
           extendBody: true,
           appBar: PreferredSize(
-            preferredSize: Size.fromHeight(50 + topStatusBarSpacing),
+            preferredSize: Size.fromHeight(headerHeight + headerGap),
             child: Stack(
               fit: StackFit.expand,
               children: [
@@ -923,7 +950,7 @@ class _MainShellState extends State<MainShell> {
                     right: 16,
                   ),
                   child: SizedBox(
-                    height: 50,
+                    height: headerHeight,
                     child: Row(
                       children: [
                         // Logonun etrafında kesinlikle katman yok.
@@ -933,8 +960,8 @@ class _MainShellState extends State<MainShell> {
                           isDark
                               ? 'assets/images/demirturk-emblem-white.png'
                               : 'assets/images/demirturk-emblem-dark.png',
-                          width: 24,
-                          height: 19,
+                          width: 28.8 * headerScale,
+                          height: 22.8 * headerScale,
                           fit: BoxFit.contain,
                         ),
                         const SizedBox(width: 9),
@@ -946,7 +973,7 @@ class _MainShellState extends State<MainShell> {
                               Text(
                                 'DEMİRTÜRK',
                                 style: TextStyle(
-                                  fontSize: 13.5,
+                                  fontSize: 16.2 * headerScale,
                                   fontWeight: FontWeight.w700,
                                   letterSpacing: 0.5,
                                   height: 1.1,
@@ -957,7 +984,7 @@ class _MainShellState extends State<MainShell> {
                               Text(
                                 'MOBİL',
                                 style: TextStyle(
-                                  fontSize: 8.5,
+                                  fontSize: 10.2 * headerScale,
                                   fontWeight: FontWeight.w300,
                                   letterSpacing: 3.0,
                                   height: 1.1,
@@ -975,8 +1002,8 @@ class _MainShellState extends State<MainShell> {
                           pressedOpacity: 0.65,
                           onPressed: _showAiComingSoon,
                           child: SizedBox(
-                            width: 32,
-                            height: 32,
+                            width: 35.2 * headerScale,
+                            height: 35.2 * headerScale,
                             child: Stack(
                               clipBehavior: Clip.none,
                               alignment: Alignment.center,
@@ -986,7 +1013,7 @@ class _MainShellState extends State<MainShell> {
                                       ? 'assets/images/demirturk-emblem-white.png'
                                       : 'assets/images/demirturk-emblem-dark.png',
                                   width: 20,
-                                  height: 18,
+                                  height: 19.8 * headerScale,
                                   fit: BoxFit.contain,
                                 ),
                                 Positioned(
@@ -994,7 +1021,7 @@ class _MainShellState extends State<MainShell> {
                                   right: 1,
                                   child: Icon(
                                     CupertinoIcons.sparkles,
-                                    size: 11,
+                                    size: 12.1 * headerScale,
                                     color: const Color(0xFFE11D48),
                                   ),
                                 ),
@@ -1013,8 +1040,8 @@ class _MainShellState extends State<MainShell> {
                             repository: _portalRepository,
                           ),
                           child: Container(
-                            width: 32,
-                            height: 32,
+                            width: 35.2 * headerScale,
+                            height: 35.2 * headerScale,
                             decoration: BoxDecoration(
                               color: AppGlass.subtleSurface(context),
                               shape: BoxShape.circle,
@@ -1024,7 +1051,7 @@ class _MainShellState extends State<MainShell> {
                               children: [
                                 Icon(
                                   CupertinoIcons.bell,
-                                  size: 16,
+                                  size: 17.6 * headerScale,
                                   color: AppGlass.textPrimary(context),
                                 ),
                                 if (widget.appState.unreadNotificationCount > 0)
@@ -1052,8 +1079,8 @@ class _MainShellState extends State<MainShell> {
                             pressedOpacity: 0.65,
                             onPressed: _showStaffProfile,
                             child: Container(
-                              width: 32,
-                              height: 32,
+                              width: 35.2 * headerScale,
+                              height: 35.2 * headerScale,
                               decoration: BoxDecoration(
                                 color: AppGlass.subtleSurface(context),
                                 shape: BoxShape.circle,
@@ -1234,8 +1261,8 @@ class _MainShellState extends State<MainShell> {
           padding: EdgeInsets.fromLTRB(16, 6, 16, bottomPad),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF141312).withValues(alpha: 0.62)
-                : const Color(0xFFF8F9FB).withValues(alpha: 0.64),
+                ? const Color(0xFF141312).withValues(alpha: 0.48)
+                : const Color(0xFFF8F9FB).withValues(alpha: 0.48),
           ),
           child: Stack(
             children: [
@@ -1256,8 +1283,8 @@ class _MainShellState extends State<MainShell> {
                     child: Container(
                       decoration: BoxDecoration(
                         color: isDark
-                            ? const Color(0xFFF5F3F0)
-                            : const Color(0xFF1E293B),
+                            ? const Color(0xFFF5F3F0).withValues(alpha: .9)
+                            : const Color(0xFF1E293B).withValues(alpha: .9),
                         borderRadius: BorderRadius.circular(18),
                       ),
                     ),
@@ -1396,7 +1423,7 @@ class _MainShellState extends State<MainShell> {
         break;
     }
 
-    final content = _customerContractPending && !showProjectShowcase
+    final content = _customerContractPending
         ? Column(
             children: [
               _buildPendingContractBanner(),
@@ -1446,7 +1473,7 @@ class _MainShellState extends State<MainShell> {
       border: Border.all(color: const Color(0xFFFF9F0A).withValues(alpha: .32)),
       borderRadius: BorderRadius.circular(14),
     ),
-    child: const Row(
+    child: Row(
       children: [
         Icon(
           CupertinoIcons.doc_text_search,
@@ -1456,9 +1483,11 @@ class _MainShellState extends State<MainShell> {
         SizedBox(width: 8),
         Expanded(
           child: Text(
-            'Sözleşmeniz onay bekliyor. Onaylandığında sözleşme ve senet bilgileriniz görünür.',
+            'Sözleşmeniz henüz atanmadı. Atandığında bilgilerini ve ödemelerinizi görebilirsiniz.',
             style: TextStyle(
-              color: Color(0xFFFFD08A),
+              color: AppGlass.isDark(context)
+                  ? const Color(0xFFFFE2B5)
+                  : const Color(0xFF503500),
               fontSize: 11.5,
               height: 1.35,
             ),
@@ -1492,354 +1521,14 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Widget _buildCustomerSettingsTab() {
-    final isDark = AppGlass.isDark(context);
-    final currentMode = widget.appState.themeMode;
-
-    String modeShortLabel(ThemeMode mode) {
-      switch (mode) {
-        case ThemeMode.system:
-          return 'Sistem';
-        case ThemeMode.light:
-          return 'Aydınlık';
-        case ThemeMode.dark:
-          return 'Koyu';
-      }
-    }
-
-    IconData modeIcon(ThemeMode mode) {
-      switch (mode) {
-        case ThemeMode.system:
-          return CupertinoIcons.device_phone_portrait;
-        case ThemeMode.light:
-          return CupertinoIcons.sun_max_fill;
-        case ThemeMode.dark:
-          return CupertinoIcons.moon_stars_fill;
-      }
-    }
-
-    final options = <(ThemeMode, String, IconData)>[
-      (ThemeMode.system, 'Sistem', CupertinoIcons.device_phone_portrait),
-      (ThemeMode.light, 'Aydınlık', CupertinoIcons.sun_max_fill),
-      (ThemeMode.dark, 'Koyu', CupertinoIcons.moon_stars_fill),
-    ];
-
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            'Sözleşmelerim',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-              color: AppGlass.textPrimary(context),
-            ),
-          ),
-        ),
-        CustomerContractCard(
-          customer: widget.appState.currentCustomer,
-          repository: _portalRepository,
-        ),
-        const SizedBox(height: 24),
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Text(
-            'Ayarlar',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.4,
-              color: AppGlass.textPrimary(context),
-            ),
-          ),
-        ),
-        GlassCard(
-          borderRadius: 22,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  setState(() {
-                    _isThemeMenuOpen = !_isThemeMenuOpen;
-                  });
-                },
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppGlass.subtleSurface(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        isDark
-                            ? CupertinoIcons.moon_stars_fill
-                            : CupertinoIcons.sun_max_fill,
-                        size: 17,
-                        color: AppGlass.textPrimary(context),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Görünüm',
-                            style: TextStyle(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.2,
-                              color: AppGlass.textPrimary(context),
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            isDark ? 'Koyu görünüm' : 'Aydınlık görünüm',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppGlass.textMuted(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppGlass.subtleSurface(context),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: AppGlass.dividerColor(context),
-                          width: 0.6,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            modeIcon(currentMode),
-                            size: 13.5,
-                            color: AppGlass.textPrimary(context),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            modeShortLabel(currentMode),
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: -0.2,
-                              color: AppGlass.textPrimary(context),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          AnimatedRotation(
-                            turns: _isThemeMenuOpen ? 0.5 : 0.0,
-                            duration: const Duration(milliseconds: 220),
-                            curve: Curves.easeOutCubic,
-                            child: Icon(
-                              CupertinoIcons.chevron_down,
-                              size: 12,
-                              color: AppGlass.textSecondary(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              AnimatedCrossFade(
-                firstChild: const SizedBox(width: double.infinity, height: 0),
-                secondChild: Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: AppGlass.subtleSurface(context),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: AppGlass.dividerColor(context),
-                        width: 0.6,
-                      ),
-                    ),
-                    child: Column(
-                      children: options.map((opt) {
-                        final mode = opt.$1;
-                        final label = opt.$2;
-                        final icon = opt.$3;
-                        final isSelected = currentMode == mode;
-
-                        final activeBg = isDark
-                            ? const Color(0xFFF5F3F0)
-                            : const Color(0xFF1E293B);
-                        final activeFg = isDark
-                            ? const Color(0xFF121110)
-                            : Colors.white;
-
-                        return GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () {
-                            unawaited(_saveThemeMode(mode));
-                            setState(() {
-                              _isThemeMenuOpen = false;
-                            });
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.easeOutCubic,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 10,
-                            ),
-                            decoration: BoxDecoration(
-                              color: isSelected ? activeBg : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  icon,
-                                  size: 15,
-                                  color: isSelected
-                                      ? activeFg
-                                      : AppGlass.textSecondary(context),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    label,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: isSelected
-                                          ? FontWeight.w700
-                                          : FontWeight.w500,
-                                      letterSpacing: -0.2,
-                                      color: isSelected
-                                          ? activeFg
-                                          : AppGlass.textPrimary(context),
-                                    ),
-                                  ),
-                                ),
-                                if (isSelected)
-                                  Icon(
-                                    CupertinoIcons.checkmark_alt,
-                                    size: 15,
-                                    color: activeFg,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                ),
-                crossFadeState: _isThemeMenuOpen
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                duration: const Duration(milliseconds: 220),
-                sizeCurve: Curves.easeOutCubic,
-              ),
-              Divider(height: 20, color: AppGlass.dividerColor(context)),
-              CupertinoButton(
-                padding: EdgeInsets.zero,
-                onPressed: _portalRepository == null ? null : _changePassword,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: AppGlass.subtleSurface(context),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        CupertinoIcons.lock_rotation,
-                        size: 17,
-                        color: AppGlass.textPrimary(context),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Parolayı değiştir',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppGlass.textPrimary(context),
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      CupertinoIcons.chevron_right,
-                      size: 15,
-                      color: AppGlass.textMuted(context),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        const CompanyLinksCard(),
-        ListTile(
-          leading: const Icon(Icons.notifications_outlined),
-          title: const Text('Bildirimler'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _enablePushNotifications,
-        ),
-        const SizedBox(height: 20),
-        Center(
-          child: CupertinoButton(
-            padding: EdgeInsets.zero,
-            onPressed: widget.onLogout,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 23, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: const Color(0xFFE11D48).withValues(alpha: 0.72),
-                  width: 1,
-                ),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    CupertinoIcons.square_arrow_left,
-                    size: 16,
-                    color: Color(0xFFE11D48),
-                  ),
-                  SizedBox(width: 8),
-                  Text(
-                    'Çıkış yap',
-                    style: TextStyle(
-                      color: Color(0xFFE11D48),
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
+  Widget _buildCustomerSettingsTab() => CustomerAccountSettings(
+    state: widget.appState,
+    repository: _portalRepository,
+    onLogout: widget.onLogout,
+    onUpdated: _refreshMyCustomer,
+    onThemeChanged: _saveThemeMode,
+    onNotifications: _enablePushNotifications,
+  );
 }
 
 class _StaffProfilePage extends StatelessWidget {

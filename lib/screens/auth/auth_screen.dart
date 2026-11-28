@@ -1,4 +1,5 @@
 import '../../services/user_facing_error.dart';
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../../models/app_models.dart';
 import '../../services/app_state.dart';
 import '../../services/auth_repository.dart';
 import '../../services/backend_config.dart';
+import '../../services/staff_login_policy.dart';
 import '../../utils/turkish_phone_input_formatter.dart';
 import '../../widgets/website_blurred_background.dart';
 import '../../widgets/company_links.dart';
@@ -28,12 +30,13 @@ class _AuthScreenState extends State<AuthScreen> {
   );
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
   final _passwordFocusNode = FocusNode();
 
   bool _isRegistering = false;
-  bool _isAdmin = false;
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _awaitingOtp = false;
@@ -47,9 +50,12 @@ class _AuthScreenState extends State<AuthScreen> {
     _phoneController.addListener(_handlePhoneChange);
   }
 
-  bool get _showPasswordDotAnimation => !_isPasswordVisible;
+  bool get _flexiblePassword =>
+      !_isRegistering &&
+      (_phoneController.text.contains('@') ||
+          usesStaffPasswordInput(_phoneController.text));
   // Recover through the company after an independent identity check.
-  bool get _canRequestPasswordReset => !_isAdmin;
+  bool get _canRequestPasswordReset => true;
 
   void _handlePhoneChange() {
     if (mounted) setState(() {});
@@ -64,6 +70,8 @@ class _AuthScreenState extends State<AuthScreen> {
     _phoneController.removeListener(_handlePhoneChange);
     _passwordController.removeListener(_handlePasswordChange);
     _phoneController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
     _passwordFocusNode.dispose();
@@ -85,22 +93,6 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _submit() async {
-    // Manager registration is handled by a trusted server function and never
-    // enters the customer phone-OTP flow.
-    if (_isAdmin && (_awaitingOtp || _resetPasswordFlow)) {
-      setState(() {
-        _awaitingOtp = false;
-        _resetPasswordFlow = false;
-        _resetPasswordReady = false;
-        _otpController.clear();
-      });
-      _showMessage(
-        'Yönetici hesapları uygulama içinden kaydedilmez. Mevcut yönetici hesabıyla giriş yapın.',
-        isError: true,
-      );
-      return;
-    }
-
     // Explicitly enabled only for local/review APKs. This session has no
     // Supabase identity and therefore cannot read or mutate production data.
     final enteredDigits = _phoneController.text.replaceAll(RegExp(r'\D'), '');
@@ -115,14 +107,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
     if (!_formKey.currentState!.validate()) return;
 
-    if (_isAdmin && _isRegistering) {
-      _showMessage(
-        'Personel kaydı yerel olarak açılamaz. Önce Supabase Auth hesabı oluşturup profiles tablosunda personel rolünü tanımlayın.',
-        isError: true,
-      );
-      return;
-    }
-
     final config = BackendConfig.fromEnvironment();
     if (!config.isConfigured) {
       _showMessage(
@@ -132,7 +116,9 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final phone = _normalizePhone(_phoneController.text)!;
+    final phone = _phoneController.text.contains('@')
+        ? _phoneController.text.trim().toLowerCase()
+        : _normalizePhone(_phoneController.text)!;
     setState(() => _isLoading = true);
     try {
       final auth = AuthRepository(Supabase.instance.client);
@@ -176,6 +162,8 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await auth.register(
           phone: phone,
           password: _passwordController.text,
+          fullName: _nameController.text.trim(),
+          email: _emailController.text.trim(),
         );
         if (response.session == null || response.user == null) {
           _showMessage(
@@ -218,20 +206,6 @@ class _AuthScreenState extends State<AuthScreen> {
           _showMessage('Hesap profili bulunamadı.', isError: true);
           return;
         }
-        if (_isAdmin && !userRole.isStaff) {
-          await auth.signOut();
-          _showMessage(
-            'Bu hesapta yönetici yetkisi bulunmuyor.',
-            isError: true,
-          );
-          return;
-        }
-        if (!_isAdmin && userRole.isStaff) {
-          await auth.signOut();
-          _showMessage('Yönetici girişi bölümünü kullanın.', isError: true);
-          return;
-        }
-
         widget.onAuthenticated?.call(userRole);
       }
     } on AuthException catch (error) {
@@ -250,10 +224,10 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
-  void _setMode({bool? registering, bool? admin}) {
+  void _setMode({bool? registering}) {
+    _passwordController.clear();
     setState(() {
-      _isAdmin = admin ?? _isAdmin;
-      _isRegistering = _isAdmin ? false : (registering ?? _isRegistering);
+      _isRegistering = registering ?? _isRegistering;
       _awaitingOtp = false;
       _resetPasswordFlow = false;
       _resetPasswordReady = false;
@@ -266,11 +240,22 @@ class _AuthScreenState extends State<AuthScreen> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Hesabınızı kurtarın'),
-        content: const Text('Parolanızı unuttuysanız şirketimizle iletişime geçin. Kimliğiniz kontrol edildikten sonra hesabınızı kurtarmanıza yardımcı olacağız. Parolanızı veya doğrulama kodunuzu paylaşmayın.'),
+        content: const Text(
+          'Parolanızı unuttuysanız şirketimizle iletişime geçin. Kimliğiniz kontrol edildikten sonra hesabınızı kurtarmanıza yardımcı olacağız. Parolanızı veya doğrulama kodunuzu paylaşmayın.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Vazgeç')),
-          TextButton(onPressed: () => Navigator.pop(dialogContext, companyEmail), child: const Text('E-posta')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, companyPhone), child: const Text('Şirketi ara')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Vazgeç'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, companyEmail),
+            child: const Text('E-posta'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, companyPhone),
+            child: const Text('Şirketi ara'),
+          ),
         ],
       ),
     );
@@ -289,20 +274,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 62,
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _ManagerEntry(
-              isDark: isDark,
-              isAdmin: _isAdmin,
-              onPressed: () => _setMode(admin: !_isAdmin, registering: false),
-            ),
-          ),
-        ),
-      ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -345,14 +316,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                 : _awaitingOtp
                                 ? 'Telefonunuzu doğrulayın'
                                 : _isRegistering
-                                ? (_isAdmin
-                                      ? 'Yönetici kaydı'
-                                      : 'Hesap oluşturun')
-                                : (_isAdmin
-                                      ? 'Yönetici girişi'
-                                      : 'Tekrar hoş geldiniz'),
+                                ? 'Hesap oluşturun'
+                                : 'Tekrar hoş geldiniz',
                             key: ValueKey(
-                              '$_isAdmin-$_isRegistering-$_awaitingOtp-title',
+                              '$_isRegistering-$_awaitingOtp-title',
                             ),
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -388,12 +355,10 @@ class _AuthScreenState extends State<AuthScreen> {
                                       ? 'SMS ile gelen 6 haneli kodu girin.'
                                       : 'SMS ile gelen 6 haneli kodu girin.'
                                 : _isRegistering
-                                ? (_isAdmin
-                                      ? 'Personel hesabı oluşturun.'
-                                      : 'Demirtürk hesabınıza güvenle erişin.')
+                                ? 'Demirtürk hesabınıza güvenle erişin.'
                                 : 'Hesabınıza güvenli şekilde giriş yapın.',
                             key: ValueKey(
-                              '$_isAdmin-$_isRegistering-$_awaitingOtp-subtitle',
+                              '$_isRegistering-$_awaitingOtp-subtitle',
                             ),
                             textAlign: TextAlign.center,
                             style: TextStyle(
@@ -413,22 +378,77 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (_isRegistering) ...[
+                                  _AuthField(
+                                    controller: _nameController,
+                                    label: 'Adı ve Soyadı',
+                                    hint: 'Adınız ve soyadınız',
+                                    icon: CupertinoIcons.person,
+                                    fill: fieldFill,
+                                    foreground: foreground,
+                                    muted: muted,
+                                    validator: (value) =>
+                                        (value?.trim().length ?? 0) >= 3
+                                        ? null
+                                        : 'Adınızı ve soyadınızı girin.',
+                                  ),
+                                  const SizedBox(height: 13),
+                                  _AuthField(
+                                    controller: _emailController,
+                                    label: 'E-posta',
+                                    hint: 'E-posta adresiniz',
+                                    icon: CupertinoIcons.mail,
+                                    fill: fieldFill,
+                                    foreground: foreground,
+                                    muted: muted,
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator: (value) =>
+                                        RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                            .hasMatch(value?.trim() ?? '')
+                                        ? null
+                                        : 'Geçerli bir e-posta adresi girin.',
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 5,
+                                      bottom: 13,
+                                    ),
+                                    child: Text(
+                                      'E-posta adresi kayıttan sonra değiştirilemez.',
+                                      style: TextStyle(
+                                        color: secondary,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 if (!_resetPasswordReady)
                                   _AuthField(
                                     controller: _phoneController,
-                                    label: 'Telefon numarası',
-                                    hint: '5XX XXX XX XX',
+                                    label: _isRegistering
+                                        ? 'Telefon numarası'
+                                        : 'Telefon numarası veya e-posta',
+                                    hint: _isRegistering
+                                        ? '5XX XXX XX XX'
+                                        : 'Telefon numaranız veya e-postanız',
                                     icon: CupertinoIcons.phone,
                                     fill: fieldFill,
                                     foreground: foreground,
                                     muted: muted,
-                                    prefixText: '+90',
-                                    keyboardType: TextInputType.phone,
+                                    prefixText: _isRegistering ? '+90' : null,
+                                    keyboardType: _isRegistering
+                                        ? TextInputType.phone
+                                        : TextInputType.emailAddress,
                                     inputFormatters: [
-                                      TurkishPhoneInputFormatter(),
+                                      if (_isRegistering)
+                                        TurkishPhoneInputFormatter(),
                                     ],
                                     enabled: !_awaitingOtp,
                                     validator: (value) {
+                                      if (!_isRegistering &&
+                                          RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                              .hasMatch(value?.trim() ?? ''))
+                                        return null;
                                       return _normalizePhone(value ?? '') !=
                                               null
                                           ? null
@@ -439,58 +459,53 @@ class _AuthScreenState extends State<AuthScreen> {
                                   const SizedBox(height: 13),
                                   _AuthField(
                                     controller: _passwordController,
-                                    label: '',
-                                    hint: '6 haneli parolanız',
+                                    key: ValueKey(
+                                      'password-$_flexiblePassword-$_isRegistering',
+                                    ),
+                                    label: 'Şifre',
+                                    hint: 'Şifreniz',
                                     icon: CupertinoIcons.lock,
                                     fill: fieldFill,
                                     foreground: foreground,
                                     muted: muted,
                                     focusNode: _passwordFocusNode,
-                                    morphToDots: _showPasswordDotAnimation,
-                                    dotCount: _passwordController.text.length,
                                     obscureText: !_isPasswordVisible,
                                     obscuringCharacter: '●',
-                                    suffix:
-                                        _canRequestPasswordReset &&
-                                            !_showPasswordDotAnimation
-                                        ? CupertinoButton(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 6,
-                                            ),
-                                            minimumSize: Size.zero,
-                                            onPressed: _requestPasswordReset,
-                                            child: Text(
-                                              'Unuttum',
-                                              style: TextStyle(
-                                                color: muted,
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                          )
-                                        : IconButton(
-                                            splashRadius: 18,
-                                            onPressed: () => setState(
-                                              () => _isPasswordVisible =
-                                                  !_isPasswordVisible,
-                                            ),
-                                            icon: Icon(
-                                              _isPasswordVisible
-                                                  ? CupertinoIcons.eye_slash
-                                                  : CupertinoIcons.eye,
-                                              size: 18,
-                                              color: muted,
-                                            ),
-                                          ),
+                                    suffix: IconButton(
+                                      splashRadius: 18,
+                                      onPressed: () => setState(
+                                        () => _isPasswordVisible =
+                                            !_isPasswordVisible,
+                                      ),
+                                      icon: Icon(
+                                        _isPasswordVisible
+                                            ? CupertinoIcons.eye_slash
+                                            : CupertinoIcons.eye,
+                                        size: 18,
+                                        color: muted,
+                                      ),
+                                    ),
                                     enabled: !_awaitingOtp,
-                                    keyboardType: TextInputType.number,
+                                    keyboardType: _flexiblePassword
+                                        ? TextInputType.visiblePassword
+                                        : TextInputType.number,
                                     textInputAction: TextInputAction.done,
                                     inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                      LengthLimitingTextInputFormatter(6),
+                                      if (!_flexiblePassword)
+                                        FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(
+                                        _flexiblePassword ? 128 : 6,
+                                      ),
                                     ],
-                                    maxLength: 6,
+                                    maxLength: _flexiblePassword ? 128 : 6,
                                     validator: (value) {
+                                      if (_flexiblePassword) {
+                                        return value != null &&
+                                                value.length >= 6 &&
+                                                value.length <= 128
+                                            ? null
+                                            : 'Parolanızı kontrol edin.';
+                                      }
                                       if (_isRegistering ||
                                           _resetPasswordReady) {
                                         return value != null &&
@@ -505,8 +520,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                           : 'Parola 6 rakamdan oluşmalı.';
                                     },
                                   ),
-                                  if (_canRequestPasswordReset &&
-                                      _showPasswordDotAnimation)
+                                  if (_canRequestPasswordReset)
                                     Align(
                                       alignment: Alignment.center,
                                       child: CupertinoButton(
@@ -580,20 +594,19 @@ class _AuthScreenState extends State<AuthScreen> {
                           ),
                         ),
                         const SizedBox(height: 27),
-                        if (!_isAdmin)
-                          Center(
-                            child: SizedBox(
-                              width: 88,
-                              child: _ModeToggle(
-                                isDark: isDark,
-                                isRegistering: _isRegistering,
-                                onChange: _awaitingOtp
-                                    ? null
-                                    : (registering) =>
-                                          _setMode(registering: registering),
-                              ),
+                        Center(
+                          child: SizedBox(
+                            width: 88,
+                            child: _ModeToggle(
+                              isDark: isDark,
+                              isRegistering: _isRegistering,
+                              onChange: _awaitingOtp
+                                  ? null
+                                  : (registering) =>
+                                        _setMode(registering: registering),
                             ),
                           ),
+                        ),
                         const SizedBox(height: 18),
                         const CompanyLinksFooter(),
                       ],
@@ -665,6 +678,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
 class _AuthField extends StatelessWidget {
   const _AuthField({
+    super.key,
     required this.controller,
     required this.label,
     required this.hint,
@@ -672,49 +686,39 @@ class _AuthField extends StatelessWidget {
     required this.fill,
     required this.foreground,
     required this.muted,
+    this.focusNode,
+    this.prefixText,
+    this.suffix,
+    this.obscureText = false,
+    this.obscuringCharacter = '●',
     this.keyboardType,
     this.textInputAction,
     this.inputFormatters,
     this.maxLength,
-    this.obscureText = false,
-    this.prefixText,
-    this.suffix,
-    this.validator,
     this.enabled = true,
-    this.focusNode,
-    this.obscuringCharacter = '•',
-    this.morphToDots = false,
-    this.dotCount = 0,
+    this.validator,
   });
-
   final TextEditingController controller;
-  final String label;
-  final String hint;
+  final String label, hint;
   final IconData icon;
-  final Color fill;
-  final Color foreground;
-  final Color muted;
+  final Color fill, foreground, muted;
+  final FocusNode? focusNode;
+  final String? prefixText;
+  final Widget? suffix;
+  final bool obscureText, enabled;
+  final String obscuringCharacter;
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final List<TextInputFormatter>? inputFormatters;
   final int? maxLength;
-  final bool obscureText;
-  final String? prefixText;
-  final Widget? suffix;
   final String? Function(String?)? validator;
-  final bool enabled;
-  final FocusNode? focusNode;
-  final String obscuringCharacter;
-  final bool morphToDots;
-  final int dotCount;
-
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (label.isNotEmpty) ...[
         Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 7),
+          padding: const EdgeInsets.only(left: 4),
           child: Text(
             label,
             style: TextStyle(
@@ -724,221 +728,68 @@ class _AuthField extends StatelessWidget {
             ),
           ),
         ),
-        LayoutBuilder(
-          builder: (context, constraints) => Align(
-            alignment: Alignment.center,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 880),
-              curve: Curves.easeInOutCubic,
-              // Keep the focused input geometry stable while the dot view is
-              // shown; IMEs can otherwise mishandle backspace during resize.
-              width: constraints.maxWidth,
-              decoration: BoxDecoration(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(morphToDots ? 28 : 18),
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  AnimatedOpacity(
-                    duration: const Duration(milliseconds: 520),
-                    curve: Curves.easeInOutCubic,
-                    opacity: morphToDots ? 0 : 1,
-                    child: TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      onTapAlwaysCalled: true,
-                      onTap: morphToDots
-                          ? () {
-                              controller.selection = TextSelection.collapsed(
-                                offset: controller.text.length,
-                              );
-                            }
-                          : null,
-                      enableInteractiveSelection: !morphToDots,
-                      keyboardType: keyboardType,
-                      textInputAction: textInputAction,
-                      inputFormatters: inputFormatters,
-                      maxLength: maxLength,
-                      obscureText: obscureText,
-                      obscuringCharacter: obscuringCharacter,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      enabled: enabled,
-                      validator: validator,
-                      style: TextStyle(
-                        color: foreground,
-                        fontSize: obscureText ? 19 : 13.5,
-                        letterSpacing: obscureText ? 4 : 0,
-                      ),
-                      cursorColor: const Color(0xFFE11D48),
-                      decoration: InputDecoration(
-                        hintText: hint,
-                        hintStyle: TextStyle(
-                          color: muted.withValues(alpha: 0.82),
-                          fontSize: 12.5,
-                          letterSpacing: 0,
-                        ),
-                        prefixIcon: Icon(icon, size: 18, color: muted),
-                        prefixText: prefixText,
-                        prefixStyle: TextStyle(
-                          color: foreground,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        suffixIcon: suffix,
-                        filled: true,
-                        counterText: '',
-                        fillColor: fill,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 15,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide(
-                            color: AppGlass.dividerColor(context),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE11D48),
-                            width: 1.1,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE11D48),
-                            width: 1,
-                          ),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE11D48),
-                            width: 1.1,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (morphToDots)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Semantics(
-                          label: 'Parola alanı, $dotCount rakam girildi',
-                          child: Center(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: List.generate(
-                                6,
-                                (index) => _FlightPasswordDot(
-                                  key: ValueKey('password-dot-$index'),
-                                  color: index < dotCount
-                                      ? const Color(0xFFE11D48)
-                                      : muted.withValues(alpha: 0.74),
-                                  filled: index < dotCount,
-                                  index: index,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        const SizedBox(height: 7),
       ],
-    );
-  }
-}
-
-class _FlightPasswordDot extends StatefulWidget {
-  const _FlightPasswordDot({
-    super.key,
-    required this.color,
-    required this.filled,
-    required this.index,
-  });
-
-  final Color color;
-  final bool filled;
-  final int index;
-
-  @override
-  State<_FlightPasswordDot> createState() => _FlightPasswordDotState();
-}
-
-class _FlightPasswordDotState extends State<_FlightPasswordDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 920),
-  )..forward();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final begin = widget.index * 0.08;
-    final animation = CurvedAnimation(
-      parent: _controller,
-      curve: Interval(begin, 1, curve: Curves.easeOutCubic),
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: AnimatedBuilder(
-        animation: animation,
-        builder: (context, child) {
-          final progress = animation.value;
-          return Opacity(
-            opacity: progress,
-            child: Transform.translate(
-              offset: Offset(0, (1 - progress) * 22),
-              child: Transform.rotate(
-                angle: (1 - progress) * -0.35,
-                child: Transform.scale(
-                  scale: 0.4 + (progress * 0.6),
-                  child: child,
-                ),
-              ),
-            ),
-          );
-        },
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          width: 11,
-          height: 11,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: widget.filled ? widget.color : Colors.transparent,
-            border: Border.all(color: widget.color, width: 1.6),
-            boxShadow: widget.filled
-                ? [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: 0.20),
-                      blurRadius: 7,
-                    ),
-                  ]
-                : null,
+      TextFormField(
+        controller: controller,
+        focusNode: focusNode,
+        keyboardType: keyboardType,
+        textInputAction: textInputAction,
+        inputFormatters: inputFormatters,
+        maxLength: maxLength,
+        obscureText: obscureText,
+        obscuringCharacter: obscuringCharacter,
+        autocorrect: false,
+        enableSuggestions: false,
+        enabled: enabled,
+        validator: validator,
+        style: TextStyle(color: foreground, fontSize: 13.5),
+        cursorColor: const Color(0xFFE11D48),
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: muted.withValues(alpha: .82),
+            fontSize: 12.5,
+          ),
+          prefixIcon: Icon(icon, size: 18, color: muted),
+          prefixText: prefixText,
+          prefixStyle: TextStyle(
+            color: foreground,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+          ),
+          suffixIcon: suffix,
+          filled: true,
+          counterText: '',
+          fillColor: fill,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 15,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: BorderSide(color: AppGlass.dividerColor(context)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFE11D48), width: 1.1),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFE11D48)),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0xFFE11D48), width: 1.1),
           ),
         ),
       ),
-    );
-  }
+    ],
+  );
 }
 
 class _PrimaryPillButton extends StatelessWidget {
@@ -1091,62 +942,6 @@ class _ToggleOption extends StatelessWidget {
                 borderRadius: BorderRadius.circular(24),
               ),
               child: Icon(icon, size: 17, color: selected ? foreground : muted),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ManagerEntry extends StatelessWidget {
-  const _ManagerEntry({
-    required this.isDark,
-    required this.isAdmin,
-    required this.onPressed,
-  });
-
-  final bool isDark;
-  final bool isAdmin;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isAdmin
-        ? const Color(0xFFE11D48)
-        : AppGlass.textMuted(context);
-    return Center(
-      child: Semantics(
-        button: true,
-        label: isAdmin ? 'Müşteri girişi' : 'Yönetici girişi',
-        child: Tooltip(
-          message: isAdmin ? 'Müşteri girişi' : 'Yönetici girişi',
-          child: CupertinoButton(
-            minimumSize: Size.zero,
-            padding: EdgeInsets.zero,
-            borderRadius: BorderRadius.circular(24),
-            onPressed: onPressed,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isAdmin
-                    ? const Color(0xFFE11D48)
-                          .withValues(alpha: isDark ? 0.17 : 0.10)
-                    : Colors.transparent,
-                border: Border.all(
-                  color: isAdmin
-                      ? const Color(0xFFE11D48).withValues(alpha: 0.54)
-                      : AppGlass.dividerColor(context),
-                ),
-              ),
-              child: Icon(
-                CupertinoIcons.checkmark_shield_fill,
-                size: 21,
-                color: color,
-              ),
             ),
           ),
         ),

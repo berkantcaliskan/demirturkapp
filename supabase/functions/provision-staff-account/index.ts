@@ -1,4 +1,4 @@
-import { createClient, type User } from 'npm:@supabase/supabase-js@2.119.2';
+import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supabase-js@2.119.2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +44,7 @@ function normalizePhone(value: string): string | null {
   return digits.length === 10 && digits.startsWith('5') ? `+90${digits}` : null;
 }
 
-async function isRosterPhone(admin: ReturnType<typeof createClient>, name: string, phone: string): Promise<boolean> {
+async function isRosterPhone(admin: SupabaseClient, name: string, phone: string): Promise<boolean> {
   const configured = Deno.env.get('STAFF_PHONE_ROSTER');
   if (!configured) {
     const { data, error } = await admin.from('staff_account_roster')
@@ -105,7 +105,8 @@ Deno.serve(async (request) => {
   const employee = staffRoster.get(rosterKey);
   const phone = normalizePhone(String(payload.phone ?? ''));
   const password = String(payload.password ?? '');
-  if (!employee || !phone || !/^\d{6}$/.test(password)) {
+  if (!employee || !phone || password.length < 6 || password.length > 128
+    || !/\p{L}/u.test(password) || !/\p{N}/u.test(password)) {
     return respond({ error: 'Personel adı, telefon numarası veya parola biçimi geçersiz.' }, 400);
   }
   if (!await isRosterPhone(admin, rosterKey, phone)) {

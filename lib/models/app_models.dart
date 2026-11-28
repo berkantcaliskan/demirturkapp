@@ -110,6 +110,8 @@ class SalesAdvisor {
 }
 
 class Customer {
+  final double downPaymentAmount;
+  final bool isDemo;
   final String id;
   final String name;
   final String tcOrTaxNo;
@@ -130,6 +132,8 @@ class Customer {
   final Map<String, String> foldersByOwner;
 
   const Customer({
+    this.downPaymentAmount = 0,
+    this.isDemo = false,
     required this.id,
     required this.name,
     required this.tcOrTaxNo,
@@ -156,10 +160,13 @@ class Customer {
 
   String get projectImageAsset {
     final title = (projectName ?? '').toLowerCase();
-    if (title.contains('asel') && title.contains('4')) return 'assets/images/vitrin-asel4-1.jpg';
-    if (title.contains('asel') && title.contains('3')) return 'assets/images/vitrin-asel3-1.jpg';
+    if (title.contains('asel') && title.contains('4'))
+      return 'assets/images/vitrin-asel4-1.jpg';
+    if (title.contains('asel') && title.contains('3'))
+      return 'assets/images/vitrin-asel3-1.jpg';
     if (title.contains('asel')) return 'assets/images/vitrin-asel-1.jpg';
-    if (title.contains('yenişehir') || title.contains('yenisehir')) return 'assets/images/vitrin-yenisehir-1.jpg';
+    if (title.contains('yenişehir') || title.contains('yenisehir'))
+      return 'assets/images/vitrin-yenisehir-1.jpg';
     if (title.contains('almina')) return 'assets/images/vitrin-almina-1.jpg';
     return 'assets/images/demirturk-emblem-dark.png';
   }
@@ -178,6 +185,8 @@ class Customer {
 }
 
 class PromissoryNote {
+  final String? crmPlanId;
+  final double? crmPaidAmount;
   final String id;
   final String customerId;
   final String senetNo;
@@ -196,6 +205,8 @@ class PromissoryNote {
   final String? receiptObjectPath;
 
   const PromissoryNote({
+    this.crmPlanId,
+    this.crmPaidAmount,
     required this.id,
     required this.customerId,
     required this.senetNo,
@@ -225,6 +236,8 @@ class PromissoryNote {
     String? receiptObjectPath,
   }) {
     return PromissoryNote(
+      crmPlanId: crmPlanId,
+      crmPaidAmount: crmPaidAmount,
       id: id,
       customerId: customerId,
       senetNo: senetNo,
@@ -243,6 +256,11 @@ class PromissoryNote {
       receiptObjectPath: receiptObjectPath ?? this.receiptObjectPath,
     );
   }
+
+  double get paidAmount =>
+      crmPaidAmount ?? (status == NoteStatus.paid ? amount : 0);
+  double get remainingAmount => (amount - paidAmount).clamp(0.0, amount);
+  bool get isPartiallyPaid => paidAmount > 0 && remainingAmount > 0;
 }
 
 class BankAccount {
