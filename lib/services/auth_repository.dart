@@ -60,7 +60,10 @@ class AuthRepository {
   Future<void> requestPasswordChangeOtp() => _client.auth.reauthenticate();
 
   Future<void> verifyCurrentPassword(String password) async {
-    final identity = currentUser?.email ?? currentUser?.phone;
+    final email = currentUser?.email;
+    final identity = email != null && email.isNotEmpty
+        ? email
+        : currentUser?.phone;
     if (identity == null || identity.isEmpty)
       throw const AuthException(
         'Hesap bilgilerinizi doğrulamak için şirketle iletişime geçin.',
