@@ -30,6 +30,8 @@ class _AuthScreenState extends State<AuthScreen> {
   );
   final _formKey = GlobalKey<FormState>();
   final _phoneController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
   final _passwordFocusNode = FocusNode();
@@ -49,7 +51,9 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   bool get _flexiblePassword =>
-      !_isRegistering && usesStaffPasswordInput(_phoneController.text);
+      !_isRegistering &&
+      (_phoneController.text.contains('@') ||
+          usesStaffPasswordInput(_phoneController.text));
   // Recover through the company after an independent identity check.
   bool get _canRequestPasswordReset => true;
 
@@ -66,6 +70,8 @@ class _AuthScreenState extends State<AuthScreen> {
     _phoneController.removeListener(_handlePhoneChange);
     _passwordController.removeListener(_handlePasswordChange);
     _phoneController.dispose();
+    _nameController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
     _passwordFocusNode.dispose();
@@ -110,7 +116,9 @@ class _AuthScreenState extends State<AuthScreen> {
       return;
     }
 
-    final phone = _normalizePhone(_phoneController.text)!;
+    final phone = _phoneController.text.contains('@')
+        ? _phoneController.text.trim().toLowerCase()
+        : _normalizePhone(_phoneController.text)!;
     setState(() => _isLoading = true);
     try {
       final auth = AuthRepository(Supabase.instance.client);
@@ -154,6 +162,8 @@ class _AuthScreenState extends State<AuthScreen> {
         final response = await auth.register(
           phone: phone,
           password: _passwordController.text,
+          fullName: _nameController.text.trim(),
+          email: _emailController.text.trim(),
         );
         if (response.session == null || response.user == null) {
           _showMessage(
@@ -368,22 +378,77 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (_isRegistering) ...[
+                                  _AuthField(
+                                    controller: _nameController,
+                                    label: 'Adı ve Soyadı',
+                                    hint: 'Adınız ve soyadınız',
+                                    icon: CupertinoIcons.person,
+                                    fill: fieldFill,
+                                    foreground: foreground,
+                                    muted: muted,
+                                    validator: (value) =>
+                                        (value?.trim().length ?? 0) >= 3
+                                        ? null
+                                        : 'Adınızı ve soyadınızı girin.',
+                                  ),
+                                  const SizedBox(height: 13),
+                                  _AuthField(
+                                    controller: _emailController,
+                                    label: 'E-posta',
+                                    hint: 'E-posta adresiniz',
+                                    icon: CupertinoIcons.mail,
+                                    fill: fieldFill,
+                                    foreground: foreground,
+                                    muted: muted,
+                                    keyboardType: TextInputType.emailAddress,
+                                    validator: (value) =>
+                                        RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                            .hasMatch(value?.trim() ?? '')
+                                        ? null
+                                        : 'Geçerli bir e-posta adresi girin.',
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 5,
+                                      bottom: 13,
+                                    ),
+                                    child: Text(
+                                      'E-posta adresi kayıttan sonra değiştirilemez.',
+                                      style: TextStyle(
+                                        color: secondary,
+                                        fontSize: 11.5,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                                 if (!_resetPasswordReady)
                                   _AuthField(
                                     controller: _phoneController,
-                                    label: 'Telefon numarası',
-                                    hint: '5XX XXX XX XX',
+                                    label: _isRegistering
+                                        ? 'Telefon numarası'
+                                        : 'Telefon numarası veya e-posta',
+                                    hint: _isRegistering
+                                        ? '5XX XXX XX XX'
+                                        : 'Telefon numaranız veya e-postanız',
                                     icon: CupertinoIcons.phone,
                                     fill: fieldFill,
                                     foreground: foreground,
                                     muted: muted,
-                                    prefixText: '+90',
-                                    keyboardType: TextInputType.phone,
+                                    prefixText: _isRegistering ? '+90' : null,
+                                    keyboardType: _isRegistering
+                                        ? TextInputType.phone
+                                        : TextInputType.emailAddress,
                                     inputFormatters: [
-                                      TurkishPhoneInputFormatter(),
+                                      if (_isRegistering)
+                                        TurkishPhoneInputFormatter(),
                                     ],
                                     enabled: !_awaitingOtp,
                                     validator: (value) {
+                                      if (!_isRegistering &&
+                                          RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                              .hasMatch(value?.trim() ?? ''))
+                                        return null;
                                       return _normalizePhone(value ?? '') !=
                                               null
                                           ? null

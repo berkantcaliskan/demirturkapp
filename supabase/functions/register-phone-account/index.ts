@@ -105,6 +105,13 @@ Deno.serve(async (request) => {
 
   const phone = normalizePhone(String(payload.phone ?? ''));
   const password = String(payload.password ?? '');
+  const fullName = String(payload.fullName ?? '').trim();
+  const email = String(payload.email ?? '').trim().toLowerCase();
+  // Keep old installed clients usable while new clients require both fields.
+  if ((payload.fullName !== undefined && (fullName.length < 3 || fullName.length > 100)) ||
+      (payload.email !== undefined && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254))) {
+    return respond({ error: 'Ad soyad ve e-posta adresini kontrol edin.' }, 400);
+  }
   if (!phone || !/^\d{6}$/.test(password)) {
     return respond({ error: 'Telefon numarası veya parola biçimi geçersiz.' }, 400);
   }
@@ -158,16 +165,18 @@ Deno.serve(async (request) => {
   // separate trusted management action, not by matching this unverified value.
   const { error } = await admin.auth.admin.createUser({
     phone,
+    ...(email ? { email, email_confirm: true } : {}),
     password,
     phone_confirm: true,
     app_metadata: { portal_registration: 'customer_v1' },
     user_metadata: {
-      full_name: 'Müşteri',
+      full_name: fullName || 'Müşteri',
       username_phone: phone,
       registration_method: 'phone_username_password',
     },
   });
   if (error) {
+    console.error('Registration provider error', error.code, error.message);
     const isExisting = /already|exists|duplicate/i.test(error.message);
     return respond({
       error: isExisting

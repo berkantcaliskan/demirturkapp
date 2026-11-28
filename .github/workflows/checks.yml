@@ -26,7 +26,7 @@ jobs:
         with:
           deno-version: '2.9.8'
       - name: Check finance function types and locked dependencies
-        run: deno check --no-config --node-modules-dir=none --frozen-lockfile --lock=supabase/functions/crm-finance/deno.lock supabase/functions/crm-finance/index.ts supabase/functions/crm-finance-worker/index.ts supabase/functions/provision-staff-account/index.ts supabase/functions/register-phone-account/index.ts
+        run: deno check --no-config --node-modules-dir=none --frozen-lockfile --lock=supabase/functions/crm-finance/deno.lock supabase/functions/crm-finance/index.ts supabase/functions/crm-finance-worker/index.ts supabase/functions/provision-staff-account/index.ts supabase/functions/register-phone-account/index.ts supabase/functions/account-settings/index.ts
       - run: npm ci --ignore-scripts --prefix verification/backend
       - run: npm test --prefix verification/backend
 

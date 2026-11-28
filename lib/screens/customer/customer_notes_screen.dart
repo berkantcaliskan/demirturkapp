@@ -23,7 +23,7 @@ class CustomerNotesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final customer = appState.currentCustomer;
-    final notes = appState.customerNotes;
+    final notes = appState.customerNotes.where((n) => n.installmentIndex > 0).toList();
     final total = appState.getCustomerTotalAmount(customer.id);
     final paid = appState.getCustomerPaidAmount(customer.id);
     final remaining = appState.getCustomerRemainingAmount(customer.id);

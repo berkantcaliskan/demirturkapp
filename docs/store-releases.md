@@ -13,18 +13,22 @@ administrators; force pushes and branch deletion are disabled. Work on
 ## What is automatic
 
 1. Application checks must pass before release work starts.
-2. Signed Android APK/AAB files are built and retained in Actions for 14 days.
-3. With the store connections configured, the AAB is submitted to Google Play
-   production; the IPA is submitted for Apple review with automatic release
-   after approval. Existing store listings, screenshots, review information and
-   privacy declarations must already be complete in the consoles.
+2. The selected platforms are built and retained in Actions for 14 days.
+3. The default stable-branch delivery is **iOS testing**, which uploads to internal
+   TestFlight without submitting for App Store review. Android can be selected
+   separately or together with iOS. A production delivery submits the AAB to
+   Google Play production and the IPA for Apple review with automatic release
+   after approval; store listings and declarations must be complete first.
 4. Missing connections are listed by secret **name only** in the prepare summary.
-   The final delivery job fails when either store is unconfigured; an APK artifact
-   alone is never reported as successful store delivery.
+   The final delivery job checks only the requested platforms. Missing Play
+   credentials do not block an iOS-only delivery.
 
 For a trial upload, manually run **Release to stores** on `stable`, choosing
-`testing`. That uses Play's internal track and internal TestFlight, without
-submitting an App Store release. A push to `stable` always selects production.
+`testing` and the desired `platform`. That uses Play's internal track and internal
+TestFlight, without submitting an App Store release. Repository variables
+`STORE_AUTO_DESTINATION` (testing/production) and `STORE_AUTO_PLATFORM`
+(ios/android/both) can override stable-push defaults; absent variables mean
+testing and ios.
 The workflow refuses store operations from any other branch. Store processing,
 review, managed publishing settings and device automatic-update preferences can
 delay availability after a successful upload.
@@ -63,10 +67,9 @@ App IDs already in this source:
 - Android: `com.sirket.senettakip.senet_takip`
 - iOS: `com.sirket.senettakip.senetTakip`
 
-App Store Connect has **not yet been opened** as of this setup. First enroll or
-activate Apple Developer membership, create the matching app record, complete
-its listing/review/privacy requirements and create the distribution credentials
-and API key. These cannot be supplied by the repository itself. Google Play also
+App Store Connect and distribution signing are configured; internal TestFlight
+delivery has been verified. The public listing, privacy declarations, screenshots
+and review information must be completed before production submission. Google Play also
 needs an app record and at least one manually uploaded build before Fastlane
 can manage subsequent releases. Use a dedicated Play credential; the existing
 Firebase push sender credential is unrelated and must not be reused.
@@ -92,10 +95,11 @@ Do not delete/recreate the workflow or decrease the source version/build base.
 ## Application readiness is a separate check
 
 This automation builds and submits the source. It does not deploy Supabase or
-change production data. The V15 backend hardening migration
-`20261122125818_harden_portal_runtime.sql` is still pending production deployment;
-deploy the updated `register-phone-account` and `provision-staff-account` functions
-**before** applying it. Verify live registration, contract permissions, payment
+change production data. Backend hardening and the account-settings migrations
+were deployed on 2026-11-28, after updating registration and staff provisioning.
+The deferred registration guard is required because Auth Admin writes its server
+marker after inserting a user in the same transaction. Live registration, email
+and phone login, password changes and account deletion were verified. Verify payment
 flows and device notifications before the first customer release. iOS Firebase
 registration, APNs credentials/capabilities and a physical-device push test also
 remain separate setup. Staff MFA was deferred and is not introduced by CI.

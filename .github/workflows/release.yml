@@ -11,6 +11,11 @@ on:
         type: choice
         options: [testing, production]
         default: testing
+      platform:
+        description: 'Platform to build and deliver'
+        type: choice
+        options: [ios, android, both]
+        default: ios
 
 permissions:
   contents: read
@@ -42,7 +47,19 @@ jobs:
       android_ready: ${{ steps.config.outputs.android_ready }}
       play_ready: ${{ steps.config.outputs.play_ready }}
       ios_ready: ${{ steps.config.outputs.ios_ready }}
+      destination: ${{ steps.route.outputs.destination }}
+      platform: ${{ steps.route.outputs.platform }}
     steps:
+      - name: Select release destination
+        id: route
+        env:
+          DESTINATION: ${{ inputs.destination || vars.STORE_AUTO_DESTINATION || 'testing' }}
+          PLATFORM: ${{ inputs.platform || vars.STORE_AUTO_PLATFORM || 'ios' }}
+        run: |
+          [[ "$DESTINATION" == testing || "$DESTINATION" == production ]] || exit 1
+          [[ "$PLATFORM" == ios || "$PLATFORM" == android || "$PLATFORM" == both ]] || exit 1
+          echo "destination=$DESTINATION" >> "$GITHUB_OUTPUT"
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
@@ -66,7 +83,7 @@ jobs:
     name: Android build and Play delivery
     environment: stores
     needs: prepare
-    if: needs.prepare.outputs.android_ready == 'true'
+    if: needs.prepare.outputs.android_ready == 'true' && needs.prepare.outputs.platform != 'ios'
     runs-on: ubuntu-24.04
     timeout-minutes: 50
     steps:
@@ -119,7 +136,7 @@ jobs:
         if: needs.prepare.outputs.play_ready == 'true'
         env:
           PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
-          STORE_DESTINATION: ${{ inputs.destination || 'production' }}
+          STORE_DESTINATION: ${{ needs.prepare.outputs.destination }}
         run: bundle exec fastlane android publish
       - name: Remove signing material
         if: always()
@@ -129,7 +146,7 @@ jobs:
     name: iOS build and App Store delivery
     environment: stores
     needs: prepare
-    if: needs.prepare.outputs.ios_ready == 'true'
+    if: needs.prepare.outputs.ios_ready == 'true' && needs.prepare.outputs.platform != 'android'
     runs-on: macos-26
     timeout-minutes: 70
     steps:
@@ -172,7 +189,7 @@ jobs:
           ASC_PRIVATE_KEY_BASE64: ${{ secrets.ASC_PRIVATE_KEY_BASE64 }}
           BUILD_VERSION: ${{ needs.prepare.outputs.version }}
           BUILD_NUMBER: ${{ needs.prepare.outputs.ios_build }}
-          STORE_DESTINATION: ${{ inputs.destination || 'production' }}
+          STORE_DESTINATION: ${{ needs.prepare.outputs.destination }}
         run: bundle exec fastlane ios publish
       - name: Remove signing material
         if: always()
@@ -184,20 +201,19 @@ jobs:
     if: always() && github.ref == 'refs/heads/stable'
     runs-on: ubuntu-24.04
     steps:
-      - name: Verify both store deliveries
+      - name: Verify requested store deliveries
         env:
           PLAY_READY: ${{ needs.prepare.outputs.play_ready }}
           IOS_READY: ${{ needs.prepare.outputs.ios_ready }}
           ANDROID_RESULT: ${{ needs.android.result }}
           IOS_RESULT: ${{ needs.ios.result }}
+          PLATFORM: ${{ needs.prepare.outputs.platform }}
         run: |
-          if [[ "$PLAY_READY" != true || "$IOS_READY" != true ]]; then
-            echo '::error::Store setup is incomplete. See prepare summary and docs/store-releases.md.'
-            echo 'Store submission pending: missing store connections. Available signed files are in Artifacts.' >> "$GITHUB_STEP_SUMMARY"
-            exit 1
+          [[ "$PLATFORM" == ios || "$PLATFORM" == android || "$PLATFORM" == both ]] || exit 1
+          if [[ "$PLATFORM" != android && ( "$IOS_READY" != true || "$IOS_RESULT" != success ) ]]; then
+            echo '::error::iOS delivery failed or its store setup is incomplete.'; exit 1
           fi
-          if [[ "$ANDROID_RESULT" != success || "$IOS_RESULT" != success ]]; then
-            echo '::error::One or more store deliveries failed. Inspect the platform job before retrying.'
-            exit 1
+          if [[ "$PLATFORM" != ios && ( "$PLAY_READY" != true || "$ANDROID_RESULT" != success ) ]]; then
+            echo '::error::Android delivery failed or its store setup is incomplete.'; exit 1
           fi
-          echo 'Both builds were submitted. Store review/processing and device updates are separate steps.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Requested builds were submitted. Store review/processing and device updates are separate steps.' >> "$GITHUB_STEP_SUMMARY"

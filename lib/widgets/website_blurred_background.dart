@@ -377,7 +377,7 @@ class GlassCard extends StatelessWidget {
                 width: 0.7,
               ),
             ),
-            child: child,
+            child: Material(type: MaterialType.transparency, child: child),
           ),
         ),
       ),

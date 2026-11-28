@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 /// Supabase Auth boundary used by the presentation layer.
 /// Keeping the SDK here avoids coupling screens and state to Supabase types.
 class AuthRepository {
@@ -14,6 +13,8 @@ class AuthRepository {
   Future<AuthResponse> register({
     required String phone,
     required String password,
+    required String fullName,
+    required String email,
   }) async {
     try {
       await _client.functions.invoke(
@@ -21,13 +22,16 @@ class AuthRepository {
         body: {
           'phone': phone,
           'password': password,
+          'fullName': fullName,
+          'email': email,
         },
       );
     } on FunctionException catch (error) {
       final details = error.details;
       final message = details is Map ? details['error']?.toString() : null;
       throw AuthException(
-        message ?? 'Hesap açılamadı. Bilgilerinizi kontrol edip tekrar deneyin.',
+        message ??
+            'Hesap açılamadı. Bilgilerinizi kontrol edip tekrar deneyin.',
       );
     }
     return signIn(phone: phone, password: password);
@@ -37,7 +41,12 @@ class AuthRepository {
     required String phone,
     required String password,
   }) {
-    return _client.auth.signInWithPassword(phone: phone, password: password);
+    return phone.contains('@')
+        ? _client.auth.signInWithPassword(
+            email: phone.trim().toLowerCase(),
+            password: password,
+          )
+        : _client.auth.signInWithPassword(phone: phone, password: password);
   }
 
   Future<void> requestPasswordReset(String phone) =>
@@ -51,9 +60,31 @@ class AuthRepository {
   Future<void> requestPasswordChangeOtp() => _client.auth.reauthenticate();
 
   Future<void> verifyCurrentPassword(String password) async {
-    final phone = currentUser?.phone;
-    if (phone == null || phone.isEmpty) throw const AuthException('Hesap bilgilerinizi doğrulamak için şirketle iletişime geçin.');
-    await _client.auth.signInWithPassword(phone: phone, password: password);
+    final identity = currentUser?.email ?? currentUser?.phone;
+    if (identity == null || identity.isEmpty)
+      throw const AuthException(
+        'Hesap bilgilerinizi doğrulamak için şirketle iletişime geçin.',
+      );
+    await signIn(phone: identity, password: password);
+  }
+
+  Future<Map<String, dynamic>> accountAction(
+    String action, {
+    Map<String, dynamic> values = const {},
+  }) async {
+    try {
+      final result = await _client.functions.invoke(
+        'account-settings',
+        body: {'action': action, ...values},
+      );
+      return Map<String, dynamic>.from(result.data as Map);
+    } on FunctionException catch (error) {
+      throw AuthException(
+        error.details is Map
+            ? error.details['error']?.toString() ?? 'İşlem tamamlanamadı.'
+            : 'İşlem tamamlanamadı.',
+      );
+    }
   }
 
   Future<UserResponse> updatePassword(String password, {String? nonce}) =>

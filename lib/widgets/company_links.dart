@@ -21,6 +21,16 @@ const companyEmail = CompanyLink(
   'mailto:iletisim@demirturkinsaat.com',
   Icons.mail_outline,
 );
+const companyOffice = CompanyLink(
+  'Aziziye Mahallesi, Doğu Karadeniz Caddesi, Ata Sahil Sitesi No. 1, Karasu / Sakarya',
+  'https://www.google.com/maps/search/?api=1&query=Aziziye+Mahallesi+Do%C4%9Fu+Karadeniz+Caddesi+Ata+Sahil+Sitesi+No+1+Karasu+Sakarya',
+  Icons.location_on_outlined,
+);
+const companyPrivacy = CompanyLink(
+  'Gizlilik Politikası',
+  'https://berkantcaliskan.github.io/demirturkapp/privacy.html',
+  Icons.privacy_tip_outlined,
+);
 const _socialLinks = [
   CompanyLink(
     'Instagram',
@@ -167,6 +177,7 @@ class CompanyContactCard extends StatelessWidget {
       children: [
         _CompanyLinkTile(link: companyPhone),
         _CompanyLinkTile(link: companyEmail),
+        _CompanyLinkTile(link: companyOffice),
       ],
     ),
   );

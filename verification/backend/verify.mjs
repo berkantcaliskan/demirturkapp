@@ -12,7 +12,7 @@ await db.exec(`
   grant usage on schema auth, storage to anon, authenticated, service_role;
   alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
   create table auth.users (
-    id uuid primary key, phone text unique, phone_confirmed_at timestamptz,
+    id uuid primary key, phone text unique, email text, phone_confirmed_at timestamptz,
     raw_user_meta_data jsonb not null default '{}', raw_app_meta_data jsonb not null default '{"portal_registration":"customer_v1"}'
   );
   create function auth.uid() returns uuid language sql stable as $$
@@ -21,7 +21,7 @@ await db.exec(`
   create table storage.buckets (id text primary key, name text, public boolean,
     file_size_limit bigint, allowed_mime_types text[]);
   create table storage.objects (bucket_id text not null, name text not null,
-    id uuid not null default gen_random_uuid(), metadata jsonb, created_at timestamptz not null default now(),
+    id uuid not null default gen_random_uuid(), owner uuid, owner_id text, metadata jsonb, created_at timestamptz not null default now(),
     primary key(bucket_id,name));
   alter table storage.objects enable row level security;
   grant select, insert, delete on storage.objects to authenticated;
@@ -59,4 +59,6 @@ try {
   process.exit(1);
 }
 console.log('All migrations, authorization and CRM finance checks passed.');
+await db.exec(await readFile(new URL('./account-assertions.sql', import.meta.url), 'utf8'));
+console.log('Account deletion, stale token isolation, immutable email and phone reuse checks passed.');
 await db.close();

@@ -114,7 +114,7 @@ class PortalRepository {
   }
 
   Future<List<Map<String, dynamic>>> loadCustomers({String? advisorId}) async {
-    final query = _client.from('customers').select();
+    final query = _client.from('customers').select().eq('is_demo', false);
     final rows = await _allRows((start, end) => (advisorId == null
                 ? query
                 : query.eq('assigned_advisor_id', advisorId))
@@ -598,11 +598,15 @@ class PortalRepository {
     return Uri.parse(url);
   }
 
-  Future<List<Map<String, dynamic>>> loadMyNotes() => loadNotes();
+  Future<List<Map<String, dynamic>>> loadMyNotes() => _allRows((start, end) => _client
+      .from('promissory_notes')
+      .select('*, payment_submissions(*)')
+      .order('due_date').order('id').range(start, end));
 
   Future<List<Map<String, dynamic>>> loadNotes() async => _allRows((start, end) => _client
       .from('promissory_notes')
-      .select('*, payment_submissions(*)')
+      .select('*, payment_submissions(*), customers!inner(is_demo)')
+      .eq('customers.is_demo', false)
       .order('due_date').order('id').range(start, end));
 
   Stream<List<Map<String, dynamic>>> watchNotes() => _client
